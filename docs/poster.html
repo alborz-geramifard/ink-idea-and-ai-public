@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ink Poster · Ink Idea &amp; AI</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .card { background: #fffdf8; border: 1px solid #e3d9c6; border-radius: 12px; padding: 20px; margin: 16px 0; }
+  .who { display: flex; align-items: center; gap: 12px; }
+  .who img { width: 44px; height: 44px; border-radius: 50%; }
+  video { width: 100%; max-width: 300px; border-radius: 10px; background: #000; display: block; }
+  label { display: block; font-weight: bold; margin: 14px 0 6px; }
+  textarea, select { width: 100%; font: inherit; padding: 8px; border: 1px solid #cbbfa9; border-radius: 8px; background: #fff; }
+  .row { display: flex; gap: 18px; flex-wrap: wrap; }
+  .row label { font-weight: normal; display: flex; gap: 6px; align-items: center; margin: 6px 0; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .note { background: #f3ead7; border-radius: 8px; padding: 8px 12px; font-size: 14px; margin-top: 8px; }
+  button { font: inherit; padding: 10px 22px; border-radius: 8px; border: 0; background: #fe2c55; color: #fff; cursor: pointer; }
+  button:disabled { background: #e7b7c1; cursor: not-allowed; }
+  .ghost { background: #fff; color: var(--ink); border: 1px solid #cbbfa9; }
+  .err { color: #b3261e; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="logo.png" alt="Ink Idea &amp; AI logo">
+    <div><h1>Ink Poster</h1><p class="tag">Review and post today's cartoon to TikTok.</p></div>
+  </header>
+
+  <p id="msg" class="muted">Connecting to the Ink Poster helper…</p>
+
+  <section id="login" class="card" hidden>
+    <p>Connect the TikTok account you want to post to.</p>
+    <a id="loginLink"><button>Continue with TikTok</button></a>
+  </section>
+
+  <section id="compose" hidden>
+    <div class="card who">
+      <img id="avatar" alt="">
+      <div>Posting to <strong id="nickname"></strong> <span class="muted" id="username"></span></div>
+    </div>
+
+    <div class="card">
+      <video id="preview" controls playsinline></video>
+      <p class="muted" id="length"></p>
+
+      <label for="title">Title</label>
+      <textarea id="title" rows="3" maxlength="2200"></textarea>
+
+      <label for="privacy">Who can view this video</label>
+      <select id="privacy"><option value="" selected disabled>Select…</option></select>
+
+      <label>Allow users to</label>
+      <div class="row">
+        <label><input type="checkbox" id="comment"> Comment</label>
+        <label><input type="checkbox" id="duet"> Duet</label>
+        <label><input type="checkbox" id="stitch"> Stitch</label>
+      </div>
+
+      <label><input type="checkbox" id="aigc" checked> AI-generated content</label>
+      <p class="muted">Labels this video as AI-generated on TikTok.</p>
+
+      <label title="You need to indicate if your content promotes yourself, a third party, or both.">
+        <input type="checkbox" id="disclose"> Disclose video content
+      </label>
+      <div id="discloseBox" hidden title="You need to indicate if your content promotes yourself, a third party, or both.">
+        <div class="row">
+          <label><input type="checkbox" id="yourBrand"> Your brand</label>
+          <label id="brandedLabel"><input type="checkbox" id="branded"> Branded content</label>
+        </div>
+        <p class="note" id="discloseNote">You need to indicate if your content promotes yourself, a third party, or both.</p>
+      </div>
+    </div>
+
+    <p class="muted" id="consent"></p>
+    <button id="postBtn" disabled>Post</button>
+    <p id="result"></p>
+  </section>
+
+  <footer><a href="index.html">Home</a> · <a href="privacy.html">Privacy Policy</a> · <a href="terms.html">Terms of Service</a></footer>
+</main>
+
+<script>
+const HELPER = "http://127.0.0.1:8765";
+const LABELS = { PUBLIC_TO_EVERYONE: "Everyone", MUTUAL_FOLLOW_FRIENDS: "Friends", FOLLOWER_OF_CREATOR: "Followers", SELF_ONLY: "Only me" };
+const MUSIC = '<a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank">Music Usage Confirmation</a>';
+const BRANDED = '<a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank">Branded Content Policy</a>';
+const $ = id => document.getElementById(id);
+let state = null;
+
+async function call(path, body) {
+  const r = await fetch(HELPER + path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+  const data = await r.json();
+  if (!r.ok || data.error) throw new Error(data.error || r.statusText);
+  return data;
+}
+
+async function load() {
+  const code = new URLSearchParams(location.search).get("code");
+  try {
+    if (code) { $("msg").textContent = "Finishing TikTok login…"; await call("/auth", { code }); history.replaceState(null, "", location.pathname); }
+    state = await call("/status");
+  } catch (e) {
+    $("msg").innerHTML = '<span class="err">Can\'t reach the Ink Poster helper (' + e.message + '). Start it with <code>python3 poster_server.py</code>.</span>';
+    return;
+  }
+  $("loginLink").href = state.login_url;
+  if (!state.connected) { $("msg").hidden = true; $("login").hidden = false; return; }
+  render();
+}
+
+function render() {
+  const c = state.creator, k = state.cartoon;
+  $("msg").hidden = true; $("compose").hidden = false;
+  $("avatar").src = c.creator_avatar_url || "logo.png";
+  $("nickname").textContent = c.creator_nickname;
+  $("username").textContent = "@" + c.creator_username;
+  if (!k) { $("compose").innerHTML = "<p>Nothing is queued for TikTok right now.</p>"; return; }
+  $("preview").src = HELPER + "/video/" + k.id;
+  $("title").value = k.caption;
+  const max = c.max_video_post_duration_sec;
+  $("length").textContent = `No. ${k.id} · ${k.title} · ${k.seconds} s` + (k.seconds > max ? ` — too long, TikTok allows ${max} s` : "");
+  for (const opt of c.privacy_level_options) $("privacy").add(new Option(LABELS[opt] || opt, opt));
+  for (const [box, off] of [["comment", c.comment_disabled], ["duet", c.duet_disabled], ["stitch", c.stitch_disabled]]) {
+    $(box).checked = false; $(box).disabled = !!off;
+    if (off) $(box).parentElement.title = "Turned off in this account's TikTok settings";
+  }
+  for (const id of ["privacy", "disclose", "yourBrand", "branded", "title"]) $(id).addEventListener("input", update);
+  $("postBtn").addEventListener("click", publish);
+  update();
+}
+
+function update() {
+  const k = state.cartoon, c = state.creator;
+  const disclose = $("disclose").checked, yours = $("yourBrand").checked, branded = $("branded").checked;
+  $("discloseBox").hidden = !disclose;
+  if (!disclose) { $("yourBrand").checked = $("branded").checked = false; }
+
+  // Branded content can't be private: disable "Only me" while it's checked, and branded while private.
+  const onlyMe = [...$("privacy").options].find(o => o.value === "SELF_ONLY");
+  if (onlyMe) { onlyMe.disabled = branded; onlyMe.title = branded ? "Branded content visibility cannot be set to private." : ""; }
+  const isPrivate = $("privacy").value === "SELF_ONLY";
+  $("branded").disabled = isPrivate;
+  $("brandedLabel").title = isPrivate ? "Branded content visibility cannot be set to private." : "";
+
+  if (disclose && branded) $("discloseNote").textContent = "Your video will be labeled as 'Paid partnership'.";
+  else if (disclose && yours) $("discloseNote").textContent = "Your video will be labeled as 'Promotional content'.";
+  else $("discloseNote").textContent = "You need to indicate if your content promotes yourself, a third party, or both.";
+
+  $("consent").innerHTML = "By posting, you agree to TikTok's " + (disclose && branded ? BRANDED + " and " : "") + MUSIC + ".";
+  const ok = $("privacy").value && $("title").value.trim() && (!disclose || yours || branded) && k.seconds <= c.max_video_post_duration_sec;
+  $("postBtn").disabled = !ok;
+}
+
+async function publish() {
+  $("postBtn").disabled = true;
+  $("result").textContent = "Uploading to TikTok…";
+  try {
+    const { publish_id } = await call("/post", {
+      id: state.cartoon.id, title: $("title").value, privacy: $("privacy").value,
+      allow_comment: $("comment").checked, allow_duet: $("duet").checked, allow_stitch: $("stitch").checked,
+      your_brand: $("yourBrand").checked, branded_content: $("branded").checked, is_aigc: $("aigc").checked });
+    $("result").textContent = "Posted. TikTok is processing it; it can take a few minutes to appear on your profile.";
+    poll(publish_id);
+  } catch (e) {
+    $("result").innerHTML = '<span class="err">' + e.message + "</span>"; update();
+  }
+}
+
+async function poll(publish_id, tries = 0) {
+  const s = await call("/publish/" + publish_id).catch(e => ({ status: "ERROR", fail_reason: e.message }));
+  if (s.status === "PUBLISH_COMPLETE") {
+    $("result").innerHTML = "Done — it's on TikTok." + (s.url ? ` <a href="${s.url}" target="_blank">View post</a>` : " (private posts have no public link)");
+  } else if (s.status === "FAILED" || s.status === "ERROR") {
+    $("result").innerHTML = '<span class="err">TikTok couldn\'t publish it: ' + (s.fail_reason || "unknown reason") + "</span>";
+  } else {
+    $("result").textContent = "Processing on TikTok (" + (s.status || "…") + "). This can take a few minutes.";
+    if (tries < 60) setTimeout(() => poll(publish_id, tries + 1), 5000);
+  }
+}
+
+load();
+</script>
+</body>
+</html>
