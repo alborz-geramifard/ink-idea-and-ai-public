@@ -1,0 +1,13 @@
+:root { --ink: #1d1b18; --paper: #f7f2e8; --gold: #c8892b; --muted: #6b645a; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.6 Georgia, "Times New Roman", serif; }
+main { max-width: 720px; margin: 0 auto; padding: 48px 20px 64px; }
+header { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; }
+header img { width: 72px; height: 72px; border-radius: 50%; border: 2px solid var(--gold); }
+h1 { font-size: 30px; margin: 0; }
+h2 { font-size: 20px; margin-top: 32px; }
+a { color: var(--gold); }
+.tag { color: var(--muted); margin: 4px 0 0; }
+ul.links { list-style: none; padding: 0; }
+ul.links li { margin: 6px 0; }
+footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #ddd3c2; color: var(--muted); font-size: 14px; }
