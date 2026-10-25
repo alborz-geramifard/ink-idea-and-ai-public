@@ -119,7 +119,8 @@ function render() {
   $("nickname").textContent = c.creator_nickname;
   $("username").textContent = "@" + c.creator_username;
   if (!k) { $("compose").innerHTML = "<p>Nothing is queued for TikTok right now.</p>"; return; }
-  $("preview").src = HELPER + "/video/" + k.id;
+  // <video src> to the local helper is blocked by Chrome's local-network rules; fetch() is allowed
+  fetch(HELPER + "/video/" + k.id).then(r => r.blob()).then(b => { $("preview").src = URL.createObjectURL(b); });
   $("title").value = k.caption;
   const max = c.max_video_post_duration_sec;
   $("length").textContent = `No. ${k.id} · ${k.title} · ${k.seconds} s` + (k.seconds > max ? ` — too long, TikTok allows ${max} s` : "");
