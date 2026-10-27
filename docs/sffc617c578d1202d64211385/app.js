@@ -1,6 +1,7 @@
 "use strict";
 // Ink Stats: data.json is AES-256-GCM; the key is PBKDF2-SHA256(username + "\n" + password), derived in the
-// browser. Nothing readable is on the server; the decrypted data lives only in this tab's memory.
+// browser. Nothing readable is on the server. After sign-in the derived key (never the password) is kept in
+// this browser's storage for SESSION_MS so reloads don't ask again; Lock signs out and deletes it.
 
 const PLAT = [
   {k: "tiktok", label: "TikTok", c: "--s1", brand: "tiktok", tag: ""},
@@ -31,7 +32,8 @@ const iconHtml = p => `<img src="${logo(p.brand)}" alt="${esc(p.label)}" title="
 const FOLLOW = [["tiktok", "TikTok", "--s1"], ["instagram", "Instagram", "--s2"], ["x", "X", "--s4"], ["threads", "Threads", "--s5"]];
 const FOLLOW_P = FOLLOW.map(([k, label]) => ({brand: k, label, tag: ""}));
 const RANGE_LABEL = {1: "last 24 h", 7: "last 7 days", 30: "last 30 days", 0: "since tracking began"};
-const IDLE_MS = 20 * 60 * 1000;
+const SESSION_MS = 24 * 60 * 60 * 1000;
+const SESSION = "ink-session";
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, ch => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[ch]));
@@ -40,7 +42,7 @@ const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).
 const b64 = s => Uint8Array.from(atob(s), ch => ch.charCodeAt(0));
 const t = s => new Date(s.updated).getTime();
 
-let DATA = null, charts = {}, fails = 0, idle;
+let DATA = null, charts = {}, fails = 0;
 const state = {range: 0, off: new Set(), mode: "total", sort: {key: "total", asc: false}, sel: null};
 
 // ---- theme --------------------------------------------------------------------------
@@ -54,6 +56,41 @@ $("theme").onclick = () => {
 };
 
 // ---- sign in / lock -----------------------------------------------------------------
+const enc = new TextEncoder();
+const toB64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+
+async function loadBlob() {
+  const r = await fetch("data.json?t=" + Date.now(), {cache: "no-store"});
+  if (!r.ok) throw new Error("no data");
+  return r.json();
+}
+async function decrypt(key, blob) {
+  const plain = await crypto.subtle.decrypt({name: "AES-GCM", iv: b64(blob.iv), additionalData: enc.encode(blob.aad)}, key, b64(blob.ct));
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+function saved() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SESSION) || "null");
+    if (s && s.exp > Date.now()) return s;
+    localStorage.removeItem(SESSION);
+  } catch (e) {}
+  return null;
+}
+
+(async function resume() {   // still signed in from earlier today? unlock without asking
+  const s = saved();
+  if (!s) return;
+  try {
+    const blob = await loadBlob();
+    if (blob.salt !== s.salt) throw new Error("password changed");
+    const key = await crypto.subtle.importKey("raw", b64(s.k), {name: "AES-GCM"}, false, ["decrypt"]);
+    DATA = await decrypt(key, blob);
+    start();
+  } catch (e) {
+    try { localStorage.removeItem(SESSION); } catch (e2) {}
+  }
+})();
+
 $("loginForm").addEventListener("submit", async e => {
   e.preventDefault();
   const btn = $("signin");
@@ -62,21 +99,18 @@ $("loginForm").addEventListener("submit", async e => {
   btn.textContent = "Unlocking…";
   let blob;
   try {
-    const r = await fetch("data.json?t=" + Date.now(), {cache: "no-store"});
-    if (!r.ok) throw new Error();
-    blob = await r.json();
+    blob = await loadBlob();
   } catch (err) {
     $("loginMsg").textContent = "Couldn't load the data. Try again in a minute.";
     btn.disabled = false; btn.textContent = "Sign in";
     return;
   }
+  let key;
   try {
-    const enc = new TextEncoder();
     const base = await crypto.subtle.importKey("raw", enc.encode($("user").value.trim() + "\n" + $("pass").value), "PBKDF2", false, ["deriveKey"]);
-    const key = await crypto.subtle.deriveKey({name: "PBKDF2", hash: "SHA-256", salt: b64(blob.salt), iterations: blob.iter},
-                                              base, {name: "AES-GCM", length: 256}, false, ["decrypt"]);
-    const plain = await crypto.subtle.decrypt({name: "AES-GCM", iv: b64(blob.iv), additionalData: enc.encode(blob.aad)}, key, b64(blob.ct));
-    DATA = JSON.parse(new TextDecoder().decode(plain));
+    key = await crypto.subtle.deriveKey({name: "PBKDF2", hash: "SHA-256", salt: b64(blob.salt), iterations: blob.iter},
+                                        base, {name: "AES-GCM", length: 256}, true, ["decrypt"]);
+    DATA = await decrypt(key, blob);
   } catch (err) {
     fails++;
     const wait = Math.min(60, 2 ** fails);   // each wrong guess waits longer
@@ -85,24 +119,27 @@ $("loginForm").addEventListener("submit", async e => {
     setTimeout(() => { btn.disabled = false; }, wait * 1000);
     return;
   }
+  try {
+    localStorage.setItem(SESSION, JSON.stringify({k: toB64(await crypto.subtle.exportKey("raw", key)),
+                                                  salt: blob.salt, exp: Date.now() + SESSION_MS}));
+  } catch (e) {}   // storage blocked: works for this visit only
   $("pass").value = "";
   btn.disabled = false; btn.textContent = "Sign in";
   start();
 });
 
-function lock() {
+function lock() {   // sign out: forget the saved key, wipe memory, back to sign-in
+  try { localStorage.removeItem(SESSION); } catch (e) {}
   DATA = null;
   Object.values(charts).forEach(c => c.dispose());
-  location.replace(location.pathname);   // reload: memory wiped, back to sign-in
+  location.replace(location.pathname);
 }
-function poke() { clearTimeout(idle); idle = setTimeout(lock, IDLE_MS); }
 $("lock").onclick = lock;
+setInterval(() => { if (DATA && !saved()) lock(); }, 60 * 1000);   // the day is up
 
 function start() {
   $("login").hidden = true;
   $("app").hidden = false;
-  ["pointermove", "keydown", "scroll", "touchstart"].forEach(ev => addEventListener(ev, poke, {passive: true}));
-  poke();
   $("platformChips").onclick = e => {
     const b = e.target.closest(".chip"); if (!b) return;
     state.off.has(b.dataset.k) ? state.off.delete(b.dataset.k) : state.off.add(b.dataset.k);
