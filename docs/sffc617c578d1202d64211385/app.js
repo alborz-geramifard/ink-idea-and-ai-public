@@ -1,0 +1,332 @@
+"use strict";
+// Ink Stats: data.json is AES-256-GCM; the key is PBKDF2-SHA256(username + "\n" + password), derived in the
+// browser. Nothing readable is on the server; the decrypted data lives only in this tab's memory.
+
+const PLAT = [
+  {k: "tiktok", label: "TikTok", c: "--s1"},
+  {k: "instagram_reel", label: "IG Reel", c: "--s2"},
+  {k: "instagram_image", label: "IG image", c: "--s3"},
+  {k: "x", label: "X", c: "--s4"},
+  {k: "threads", label: "Threads", c: "--s5"},
+];
+const FOLLOW = [["tiktok", "TikTok", "--s1"], ["instagram", "Instagram", "--s2"], ["x", "X", "--s4"], ["threads", "Threads", "--s5"]];
+const RANGE_LABEL = {1: "last 24 h", 7: "last 7 days", 30: "last 30 days", 0: "since tracking began"};
+const IDLE_MS = 20 * 60 * 1000;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, ch => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[ch]));
+const fmt = (n, d = 0) => n == null ? "–" : Number(n).toLocaleString(undefined, {maximumFractionDigits: d, minimumFractionDigits: d});
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const b64 = s => Uint8Array.from(atob(s), ch => ch.charCodeAt(0));
+const t = s => new Date(s.updated).getTime();
+
+let DATA = null, charts = {}, fails = 0, idle;
+const state = {range: 0, off: new Set(), mode: "total", sort: {key: "total", asc: false}, sel: null};
+
+// ---- theme --------------------------------------------------------------------------
+try { const th = localStorage.getItem("ink-theme"); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
+$("theme").onclick = () => {
+  const dark = document.documentElement.dataset.theme
+    ? document.documentElement.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.dataset.theme = dark ? "light" : "dark";
+  try { localStorage.setItem("ink-theme", document.documentElement.dataset.theme); } catch (e) {}
+  if (DATA) renderAll();
+};
+
+// ---- sign in / lock -----------------------------------------------------------------
+$("loginForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const btn = $("signin");
+  btn.disabled = true;
+  $("loginMsg").textContent = "";
+  btn.textContent = "Unlocking…";
+  let blob;
+  try {
+    const r = await fetch("data.json?t=" + Date.now(), {cache: "no-store"});
+    if (!r.ok) throw new Error();
+    blob = await r.json();
+  } catch (err) {
+    $("loginMsg").textContent = "Couldn't load the data. Try again in a minute.";
+    btn.disabled = false; btn.textContent = "Sign in";
+    return;
+  }
+  try {
+    const enc = new TextEncoder();
+    const base = await crypto.subtle.importKey("raw", enc.encode($("user").value.trim() + "\n" + $("pass").value), "PBKDF2", false, ["deriveKey"]);
+    const key = await crypto.subtle.deriveKey({name: "PBKDF2", hash: "SHA-256", salt: b64(blob.salt), iterations: blob.iter},
+                                              base, {name: "AES-GCM", length: 256}, false, ["decrypt"]);
+    const plain = await crypto.subtle.decrypt({name: "AES-GCM", iv: b64(blob.iv), additionalData: enc.encode(blob.aad)}, key, b64(blob.ct));
+    DATA = JSON.parse(new TextDecoder().decode(plain));
+  } catch (err) {
+    fails++;
+    const wait = Math.min(60, 2 ** fails);   // each wrong guess waits longer
+    $("loginMsg").textContent = `Wrong username or password. Try again in ${wait} s.`;
+    btn.textContent = "Sign in";
+    setTimeout(() => { btn.disabled = false; }, wait * 1000);
+    return;
+  }
+  $("pass").value = "";
+  btn.disabled = false; btn.textContent = "Sign in";
+  start();
+});
+
+function lock() {
+  DATA = null;
+  Object.values(charts).forEach(c => c.dispose());
+  location.replace(location.pathname);   // reload: memory wiped, back to sign-in
+}
+function poke() { clearTimeout(idle); idle = setTimeout(lock, IDLE_MS); }
+$("lock").onclick = lock;
+
+function start() {
+  $("login").hidden = true;
+  $("app").hidden = false;
+  ["pointermove", "keydown", "scroll", "touchstart"].forEach(ev => addEventListener(ev, poke, {passive: true}));
+  poke();
+  $("platformChips").innerHTML = PLAT.map(p =>
+    `<button class="chip" data-k="${p.k}" aria-pressed="true"><i style="background:var(${p.c})"></i>${p.label}</button>`).join("");
+  $("platformChips").onclick = e => {
+    const b = e.target.closest(".chip"); if (!b) return;
+    state.off.has(b.dataset.k) ? state.off.delete(b.dataset.k) : state.off.add(b.dataset.k);
+    if (state.off.size === PLAT.length) state.off.delete(b.dataset.k);   // keep at least one
+    renderAll();
+  };
+  $("range").onclick = e => { const b = e.target.closest("button"); if (!b) return; state.range = +b.dataset.r; renderAll(); };
+  $("viewMode").onclick = e => { const b = e.target.closest("button"); if (!b) return; state.mode = b.dataset.m; renderAll(); };
+  $("closeDetail").onclick = () => { state.sel = null; renderAll(); };
+  addEventListener("resize", () => Object.values(charts).forEach(c => c.resize()));
+  renderAll();
+}
+
+// ---- data helpers -------------------------------------------------------------------
+const snaps = () => DATA.snapshots;
+const latest = () => snaps()[snaps().length - 1];
+const on = () => PLAT.filter(p => !state.off.has(p.k));
+const views = (c, k) => (c && c[k] && c[k].views) || 0;
+const inter = d => d ? (d.likes || 0) + (d.comments || 0) + (d.shares || 0) + (d.saves || 0) : 0;
+
+function inRange() {
+  const all = snaps();
+  if (!state.range) return all;
+  const from = t(latest()) - state.range * 864e5;
+  const i = all.findIndex(s => t(s) >= from);
+  return all.slice(Math.max(0, i - 1));   // keep one snapshot before the window as the baseline
+}
+function totals(s) {
+  const out = {};
+  for (const p of PLAT) out[p.k] = Object.values(s.cartoons).reduce((a, c) => a + views(c, p.k), 0);
+  return out;
+}
+const allViews = s => { const tt = totals(s); return on().reduce((a, p) => a + tt[p.k], 0); };
+const allInter = s => Object.values(s.cartoons).reduce((a, c) => a + on().reduce((b, p) => b + inter(c[p.k]), 0), 0);
+const allFollowers = s => Object.values(s.followers || {}).reduce((a, v) => a + (v || 0), 0);
+const cartoonViews = c => on().reduce((a, p) => a + views(c, p.k), 0);
+function reelWatch(s) {   // median Reel watch time; > 60 s is a looping outlier, not real watching
+  const w = Object.values(s.cartoons).map(c => c.instagram_reel && c.instagram_reel.avg_watch_s)
+    .filter(v => v > 0 && v < 60).sort((a, b) => a - b);
+  return w.length ? w[Math.floor(w.length / 2)] : null;
+}
+
+// ---- tiles --------------------------------------------------------------------------
+function delta(now, then, d = 0) {
+  if (now == null || then == null) return `<span class="muted">first reading</span>`;
+  const x = now - then;
+  if (Math.abs(x) < 10 ** -d / 2) return `<span class="muted">no change</span>`;
+  return `<span class="${x > 0 ? "up" : "down"}">${x > 0 ? "▲ +" : "▼ −"}${fmt(Math.abs(x), d)}</span>`;
+}
+function renderTiles() {
+  const r = inRange(), now = latest(), then = r.length > 1 ? r[0] : null, when = RANGE_LABEL[state.range];
+  const best = Object.entries(now.cartoons).sort((a, b) => cartoonViews(b[1]) - cartoonViews(a[1]))[0];
+  const tiles = [
+    ["Views", fmt(allViews(now)), delta(allViews(now), then && allViews(then)) + ` ${when}`],
+    ["Interactions", fmt(allInter(now)), delta(allInter(now), then && allInter(then)) + ` · likes, comments, shares, saves`],
+    ["Followers", fmt(allFollowers(now)), delta(allFollowers(now), then && allFollowers(then)) + " · all platforms"],
+    ["Reel watch time", reelWatch(now) == null ? "–" : fmt(reelWatch(now), 1) + " s",
+     delta(reelWatch(now), then && reelWatch(then), 1) + " · median per Reel"],
+    ["Top cartoon", best ? `No. ${esc(best[0])}` : "–", best ? `${esc(best[1].title)} · ${fmt(cartoonViews(best[1]))} views` : ""],
+  ];
+  $("tiles").innerHTML = tiles.map(([k, v, d]) =>
+    `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join("");
+}
+
+// ---- charts -------------------------------------------------------------------------
+function chart(id) { return charts[id] || (charts[id] = echarts.init($(id), null, {renderer: "canvas"})); }
+function base() {
+  const muted = css("--text-muted"), grid = css("--grid");
+  return {
+    animationDuration: 500,
+    textStyle: {fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", color: css("--text-secondary")},
+    grid: {left: 8, right: 24, top: 36, bottom: 16, containLabel: true},
+    tooltip: {trigger: "axis", backgroundColor: css("--surface-1"), borderColor: css("--border"),
+              textStyle: {color: css("--text-primary")}, axisPointer: {type: "line", lineStyle: {color: muted}}},
+    legend: {top: 0, left: 0, icon: "circle", itemWidth: 10, itemHeight: 10, textStyle: {color: css("--text-secondary")}},
+    xAxis: {axisLine: {lineStyle: {color: grid}}, axisTick: {show: false}, axisLabel: {color: muted}, splitLine: {show: false}},
+    yAxis: {axisLine: {show: false}, splitLine: {lineStyle: {color: grid}}, axisLabel: {color: muted}},
+  };
+}
+const timeFmt = v => new Date(v).toLocaleString([], {month: "short", day: "numeric", hour: "numeric"});
+
+function renderTrend() {
+  const r = inRange(), gain = state.mode === "gain", surface = css("--surface-1");
+  document.querySelectorAll("#viewMode button").forEach(b => b.classList.toggle("on", b.dataset.m === state.mode));
+  const series = on().map(p => {
+    const pts = r.map(s => [s.updated, totals(s)[p.k]]);
+    const data = gain ? pts.slice(1).map((pt, i) => [pt[0], pt[1] - pts[i][1]]) : pts;
+    return gain
+      ? {name: p.label, type: "bar", stack: "gain", data, barMaxWidth: 28,
+         itemStyle: {color: css(p.c), borderColor: surface, borderWidth: 1}, emphasis: {focus: "series"}}
+      : {name: p.label, type: "line", data, smooth: .25, symbol: "circle", symbolSize: 8, showSymbol: data.length < 30,
+         lineStyle: {width: 2}, itemStyle: {color: css(p.c), borderColor: surface, borderWidth: 2},
+         emphasis: {focus: "series"}};
+  });
+  const o = base();
+  chart("cTrend").setOption({
+    ...o, series,
+    grid: {...o.grid, bottom: 52},
+    tooltip: {...o.tooltip, valueFormatter: v => fmt(v)},
+    xAxis: {...o.xAxis, type: "time", axisLabel: {...o.xAxis.axisLabel, formatter: v => timeFmt(v)}},
+    yAxis: {...o.yAxis, type: "value", minInterval: 1},
+    dataZoom: [{type: "inside"}, {type: "slider", height: 20, bottom: 6, borderColor: "transparent",
+               fillerColor: "rgba(200,137,43,.15)", dataBackground: {lineStyle: {color: css("--text-muted")}, areaStyle: {opacity: 0}},
+               handleStyle: {color: css("--accent")}, textStyle: {color: css("--text-muted")}}],
+    graphic: r.length < 2 ? [{type: "text", left: "center", top: "middle",
+      style: {text: "The trend fills in as refreshes come in (twice a day).", fill: css("--text-muted"), fontSize: 13}}] : [],
+  }, true);
+}
+
+function renderMix() {
+  const tt = totals(latest()), ps = on().slice().sort((a, b) => tt[a.k] - tt[b.k]), all = ps.reduce((a, p) => a + tt[p.k], 0) || 1;
+  const o = base();
+  chart("cMix").setOption({
+    ...o, legend: {show: false}, grid: {...o.grid, top: 8, right: 70},
+    tooltip: {...o.tooltip, trigger: "item", formatter: d => `${d.name}: <b>${fmt(d.value)}</b> views (${fmt(d.value / all * 100)}%)`},
+    xAxis: {...o.xAxis, type: "value", splitLine: {lineStyle: {color: css("--grid")}}},
+    yAxis: {...o.yAxis, type: "category", data: ps.map(p => p.label), splitLine: {show: false}, axisLabel: {color: css("--text-secondary")}},
+    series: [{type: "bar", barMaxWidth: 26, data: ps.map(p => ({value: tt[p.k], itemStyle: {color: css(p.c), borderRadius: [0, 4, 4, 0]}})),
+              label: {show: true, position: "right", color: css("--text-secondary"), formatter: d => `${fmt(d.value)} · ${fmt(d.value / all * 100)}%`}}],
+  }, true);
+}
+
+function renderFormat() {
+  const cs = Object.values(latest().cartoons);
+  const groups = {living: cs.filter(c => c.format === "living"), drawing: cs.filter(c => c.format === "drawing")};
+  const avg = (list, k) => list.length ? list.reduce((a, c) => a + views(c, k), 0) / list.length : 0;
+  const metrics = [["tiktok", "TikTok views"], ["instagram_reel", "IG Reel views"]];
+  const o = base();
+  chart("cFormat").setOption({
+    ...o, grid: {...o.grid, top: 36},
+    tooltip: {...o.tooltip, trigger: "axis", axisPointer: {type: "shadow"}, valueFormatter: v => fmt(v) + " per cartoon"},
+    xAxis: {...o.xAxis, type: "category", data: metrics.map(m => m[1])},
+    yAxis: {...o.yAxis, type: "value"},
+    series: [["living", "Living", "--living"], ["drawing", "Drawing", "--drawing"]].map(([k, label, c]) => ({
+      name: `${label} (${groups[k].length})`, type: "bar", barMaxWidth: 40, barGap: "8%",
+      data: metrics.map(m => Math.round(avg(groups[k], m[0]))),
+      itemStyle: {color: css(c), borderRadius: [4, 4, 0, 0]},
+      label: {show: true, position: "top", color: css("--text-secondary")}})),
+  }, true);
+  const w = k => { const v = groups[k].map(c => c.instagram_reel && c.instagram_reel.avg_watch_s).filter(v => v > 0 && v < 60);
+                   return v.length ? fmt(v.reduce((a, b) => a + b, 0) / v.length, 1) + " s" : "–"; };
+  $("formatNote").textContent = `Avg Reel watch time: living ${w("living")}, drawing ${w("drawing")}. Newer posts have had less time to collect views.`;
+}
+
+function renderFollowers() {
+  const r = inRange(), o = base(), surface = css("--surface-1");
+  chart("cFollowers").setOption({
+    ...o,
+    tooltip: {...o.tooltip, valueFormatter: v => fmt(v)},
+    xAxis: {...o.xAxis, type: "time", axisLabel: {...o.xAxis.axisLabel, formatter: v => timeFmt(v)}},
+    yAxis: {...o.yAxis, type: "value", minInterval: 1},
+    series: FOLLOW.map(([k, label, c]) => ({
+      name: label, type: "line", connectNulls: true, symbol: "circle", symbolSize: 8, showSymbol: r.length < 30,
+      data: r.map(s => [s.updated, (s.followers || {})[k] ?? null]),
+      lineStyle: {width: 2}, itemStyle: {color: css(c), borderColor: surface, borderWidth: 2}})),
+  }, true);
+}
+
+// ---- leaderboard --------------------------------------------------------------------
+function spark(values) {
+  if (values.length < 2) return `<span class="muted">·</span>`;
+  const w = 80, h = 22, max = Math.max(...values), min = Math.min(...values), span = max - min || 1;
+  const pts = values.map((v, i) => `${(i / (values.length - 1) * (w - 4) + 2).toFixed(1)},${(h - 2 - (v - min) / span * (h - 4)).toFixed(1)}`);
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">
+    <polyline points="${pts.join(" ")}" fill="none" stroke="var(--text-secondary)" stroke-width="1.5" stroke-linejoin="round"/>
+    <circle cx="${pts[pts.length - 1].split(",")[0]}" cy="${pts[pts.length - 1].split(",")[1]}" r="2.5" fill="var(--accent)"/></svg>`;
+}
+function renderBoard() {
+  const r = inRange(), now = latest(), first = r.length > 1 ? r[0] : null, ps = on();
+  const rows = Object.entries(now.cartoons).map(([n, c]) => {
+    const row = {n: +n, c, total: cartoonViews(c), inter: ps.reduce((a, p) => a + inter(c[p.k]), 0)};
+    ps.forEach(p => { row[p.k] = c[p.k] ? c[p.k].views : null; });
+    row.change = first && first.cartoons[n] ? row.total - cartoonViews(first.cartoons[n]) : null;
+    row.trend = r.map(s => s.cartoons[n] ? cartoonViews(s.cartoons[n]) : 0);
+    return row;
+  });
+  const {key, asc} = state.sort;
+  rows.sort((a, b) => ((key === "n" ? a.n - b.n : (a[key] ?? -1) - (b[key] ?? -1))) * (asc ? 1 : -1));
+  const cols = [["n", "Cartoon"], ...ps.map(p => [p.k, p.label]), ["total", "Total"], ["inter", "Interactions"],
+                ["change", "Change"], [null, "Trend"]];
+  $("board").innerHTML = `<thead><tr>${cols.map(([k, l]) =>
+      `<th ${k ? `data-k="${k}"` : ""} class="${k === key ? "sorted" + (asc ? " asc" : "") : ""}">${l}</th>`).join("")}</tr></thead><tbody>` +
+    rows.map(row => `<tr data-n="${row.n}" class="${row.n === state.sel ? "sel" : ""}">
+      <td>No. ${row.n} · ${esc(row.c.title)}${row.c.format ? `<span class="badge ${row.c.format}">${row.c.format}</span>` : ""}</td>
+      ${ps.map(p => `<td>${fmt(row[p.k])}</td>`).join("")}
+      <td><b>${fmt(row.total)}</b></td><td>${fmt(row.inter)}</td>
+      <td>${row.change == null ? `<span class="muted">–</span>` : delta(row.total, row.total - row.change)}</td>
+      <td>${spark(row.trend)}</td></tr>`).join("") + "</tbody>";
+  $("board").querySelector("thead").onclick = e => {
+    const th = e.target.closest("th[data-k]"); if (!th) return;
+    const k = th.dataset.k;
+    state.sort = {key: k, asc: state.sort.key === k ? !state.sort.asc : k === "n"};
+    renderBoard();
+  };
+  $("board").querySelector("tbody").onclick = e => {
+    const tr = e.target.closest("tr[data-n]"); if (!tr) return;
+    state.sel = +tr.dataset.n === state.sel ? null : +tr.dataset.n;
+    renderBoard(); renderDetail();
+    if (state.sel) $("detail").scrollIntoView({behavior: "smooth", block: "nearest"});
+  };
+}
+
+function renderDetail() {
+  const n = state.sel, c = n && latest().cartoons[n];
+  $("detail").hidden = !c;
+  if (!c) return;
+  $("detailTitle").textContent = `No. ${n} · ${c.title}`;
+  const r = inRange(), o = base(), surface = css("--surface-1");
+  chart("cDetail").resize();
+  chart("cDetail").setOption({
+    ...o,
+    tooltip: {...o.tooltip, valueFormatter: v => fmt(v)},
+    xAxis: {...o.xAxis, type: "time", axisLabel: {...o.xAxis.axisLabel, formatter: v => timeFmt(v)}},
+    yAxis: {...o.yAxis, type: "value", minInterval: 1},
+    series: on().filter(p => c[p.k]).map(p => ({
+      name: p.label, type: "line", symbol: "circle", symbolSize: 8, showSymbol: r.length < 30, connectNulls: true,
+      data: r.map(s => [s.updated, s.cartoons[n] && s.cartoons[n][p.k] ? s.cartoons[n][p.k].views : null]),
+      lineStyle: {width: 2}, itemStyle: {color: css(p.c), borderColor: surface, borderWidth: 2}})),
+    graphic: r.length < 2 ? [{type: "text", left: "center", top: "middle",
+      style: {text: "History builds up with each refresh.", fill: css("--text-muted"), fontSize: 13}}] : [],
+  }, true);
+  const line = (label, d, extra = "") => d ? `<div class="row"><span>${label}</span><span>${fmt(d.views)} views${extra}
+      ${d.url && /^https:\/\//.test(d.url) ? ` · <a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">open ↗</a>` : ""}</span></div>` : "";
+  $("detailStats").innerHTML = `<p class="note">“${esc(c.caption)}”${c.format ? ` · ${c.format} video` : ""}</p>` +
+    PLAT.map(p => {
+      const d = c[p.k]; if (!d) return "";
+      const bits = [d.reach != null ? `reach ${fmt(d.reach)}` : "", inter(d) ? `${fmt(inter(d))} interactions` : "",
+                    d.avg_watch_s ? `watch ${fmt(Math.min(d.avg_watch_s, 999), 1)} s` : "",
+                    d.link_clicks ? `${fmt(d.link_clicks)} link clicks` : ""].filter(Boolean);
+      return line(p.label, d, bits.length ? ` <span class="muted">· ${bits.join(" · ")}</span>` : "");
+    }).join("");
+}
+
+// ---- everything ---------------------------------------------------------------------
+function renderAll() {
+  document.querySelectorAll("#range button").forEach(b => b.classList.toggle("on", +b.dataset.r === state.range));
+  document.querySelectorAll("#platformChips .chip").forEach(b => {
+    b.classList.toggle("off", state.off.has(b.dataset.k)); b.setAttribute("aria-pressed", !state.off.has(b.dataset.k));
+  });
+  const now = latest(), errs = Object.keys(now.errors || {});
+  $("updated").textContent = `Updated ${new Date(now.updated).toLocaleString([], {dateStyle: "medium", timeStyle: "short"})}` +
+    ` · ${snaps().length} snapshot${snaps().length === 1 ? "" : "s"} since ${new Date(snaps()[0].updated).toLocaleDateString([], {month: "short", day: "numeric"})}` +
+    (errs.length ? ` · couldn't refresh: ${errs.join(", ")}` : "");
+  renderTiles(); renderTrend(); renderMix(); renderFormat(); renderBoard(); renderDetail(); renderFollowers();
+}
