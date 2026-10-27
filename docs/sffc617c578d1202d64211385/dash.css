@@ -103,3 +103,6 @@ main { max-width: 1240px; margin: 0 auto; padding: 20px 16px 40px; }
 .detail-stats .row { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--grid); padding: 6px 0; }
 .detail-stats a { color: var(--text-primary); }
 footer { margin-top: 20px; font-size: 12px; text-align: center; }
+img.pl { width: 16px; height: 16px; vertical-align: -3px; }
+.pltag { font-size: 11px; color: var(--text-secondary); margin-left: 3px; text-transform: none; letter-spacing: 0; }
+.board th img.pl { width: 15px; height: 15px; }
