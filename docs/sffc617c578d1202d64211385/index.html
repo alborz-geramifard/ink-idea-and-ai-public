@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
+<title>Ink Stats</title>
+<link rel="stylesheet" href="dash.css">
+</head>
+<body>
+<!-- Sign in: the page holds no data; data.json is AES-256-GCM, key = PBKDF2(username + password) -->
+<section id="login" class="login">
+  <form id="loginForm" autocomplete="on">
+    <img src="logo.png" alt="" class="logo">
+    <h1>Ink Stats</h1>
+    <p class="muted">Private dashboard</p>
+    <label>Username <input id="user" name="username" autocomplete="username" required></label>
+    <label>Password <input id="pass" name="password" type="password" autocomplete="current-password" required></label>
+    <button id="signin" type="submit">Sign in</button>
+    <p id="loginMsg" class="msg" role="status"></p>
+  </form>
+</section>
+
+<main id="app" hidden>
+  <header class="top">
+    <div class="brand"><img src="logo.png" alt="" class="logo sm"><div><h1>Ink Stats</h1><p class="muted" id="updated"></p></div></div>
+    <div class="controls" role="toolbar" aria-label="Filters">
+      <div class="seg" id="range" role="radiogroup" aria-label="Time range">
+        <button data-r="1">24 h</button><button data-r="7">7 d</button><button data-r="30">30 d</button><button data-r="0" class="on">All</button>
+      </div>
+      <div class="chips" id="platformChips" aria-label="Platforms"></div>
+      <button class="icon" id="theme" title="Light / dark" aria-label="Toggle light or dark">◐</button>
+      <button class="icon" id="lock" title="Lock" aria-label="Lock dashboard">⏻</button>
+    </div>
+  </header>
+
+  <section class="tiles" id="tiles" aria-label="Headline numbers"></section>
+
+  <section class="grid">
+    <article class="card wide">
+      <div class="card-h"><h2>Views over time</h2><div class="seg small" id="viewMode"><button data-m="total" class="on">Cumulative</button><button data-m="gain">Gained per refresh</button></div></div>
+      <div class="chart" id="cTrend"></div>
+    </article>
+
+    <article class="card">
+      <div class="card-h"><h2>Where the views come from</h2></div>
+      <div class="chart short" id="cMix"></div>
+    </article>
+
+    <article class="card">
+      <div class="card-h"><h2>Living vs drawing videos</h2><span class="note">avg views per cartoon</span></div>
+      <div class="chart short" id="cFormat"></div>
+      <p class="note" id="formatNote"></p>
+    </article>
+
+    <article class="card wide">
+      <div class="card-h"><h2>Cartoons</h2><span class="note">Click a row for its history. Sort by any column.</span></div>
+      <div class="scroll"><table id="board" class="board"></table></div>
+    </article>
+
+    <article class="card wide" id="detail" hidden>
+      <div class="card-h"><h2 id="detailTitle"></h2><button class="icon" id="closeDetail" aria-label="Close">✕</button></div>
+      <div class="detail-grid">
+        <div class="chart" id="cDetail"></div>
+        <div id="detailStats" class="detail-stats"></div>
+      </div>
+    </article>
+
+    <article class="card wide">
+      <div class="card-h"><h2>Followers</h2></div>
+      <div class="chart short" id="cFollowers"></div>
+    </article>
+  </section>
+
+  <footer class="muted">Refreshed twice a day · data encrypted end to end · locks after 20 minutes idle</footer>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
