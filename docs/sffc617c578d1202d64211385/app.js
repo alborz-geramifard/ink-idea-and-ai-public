@@ -3,13 +3,33 @@
 // browser. Nothing readable is on the server; the decrypted data lives only in this tab's memory.
 
 const PLAT = [
-  {k: "tiktok", label: "TikTok", c: "--s1"},
-  {k: "instagram_reel", label: "IG Reel", c: "--s2"},
-  {k: "instagram_image", label: "IG image", c: "--s3"},
-  {k: "x", label: "X", c: "--s4"},
-  {k: "threads", label: "Threads", c: "--s5"},
+  {k: "tiktok", label: "TikTok", c: "--s1", brand: "tiktok", tag: ""},
+  {k: "instagram_reel", label: "IG Reel", c: "--s2", brand: "instagram", tag: "Reel"},
+  {k: "instagram_image", label: "IG image", c: "--s3", brand: "instagram", tag: "image"},
+  {k: "x", label: "X", c: "--s4", brand: "x", tag: ""},
+  {k: "threads", label: "Threads", c: "--s5", brand: "threads", tag: ""},
 ];
+
+// Platform logos (monochrome, drawn in the text colour so they work in light and dark)
+const GLYPH = {
+  tiktok: '<path d="M12.53.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>',
+  instagram: '<rect x="2.5" y="2.5" width="19" height="19" rx="5.5" fill="none" stroke="F" stroke-width="2.2"/><circle cx="12" cy="12" r="4.4" fill="none" stroke="F" stroke-width="2.2"/><circle cx="17.6" cy="6.4" r="1.4"/>',
+  x: '<path d="M18.24 2.25h3.31l-7.23 8.26 8.5 11.24H16.17l-5.21-6.82-5.97 6.82H1.68l7.73-8.84L1.25 2.25H8.08l4.71 6.23zm-1.16 17.52h1.83L7.08 4.13H5.12z"/>',
+  threads: '<path fill="none" stroke="F" stroke-width="2.2" stroke-linecap="round" d="M16.2 11.2c-.5-2.6-2.3-3.7-4.3-3.7-2.3 0-3.7 1.3-3.9 3 M16.3 12.4c0 3-1.6 4.3-3.9 4.3-1.9 0-3.1-1-3.1-2.4 0-1.7 1.6-2.6 3.8-2.6 3.7 0 6.4 1.4 6.4 4.4 0 3.3-3 5.6-7 5.6-5.3 0-8.3-3.6-8.3-9 0-5.5 3.2-9 8.4-9 4.2 0 6.9 2 7.9 5.6"/>',
+};
+const logo = brand => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${css("--text-primary")}">${GLYPH[brand].replace(/"F"/g, `"${css("--text-primary")}"`)}</svg>`);
+const byLabel = label => PLAT.find(p => p.label === label) || FOLLOW_P.find(p => p.label === label);
+function richIcons(size = 16) {   // ECharts rich-text styles: {i_tiktok|} draws the TikTok logo
+  const r = {tag: {color: css("--text-secondary"), fontSize: 12, padding: [0, 0, 0, 4]}};
+  for (const b of Object.keys(GLYPH)) r["i_" + b] = {backgroundColor: {image: logo(b)}, width: size, height: size};
+  return r;
+}
+const iconText = label => { const p = byLabel(label); return p ? `{i_${p.brand}|}` + (p.tag ? `{tag|${p.tag}}` : "") : label; };
+const iconHtml = p => `<img src="${logo(p.brand)}" alt="${esc(p.label)}" title="${esc(p.label)}" class="pl">` +
+  (p.tag ? `<span class="pltag">${p.tag}</span>` : "");
 const FOLLOW = [["tiktok", "TikTok", "--s1"], ["instagram", "Instagram", "--s2"], ["x", "X", "--s4"], ["threads", "Threads", "--s5"]];
+const FOLLOW_P = FOLLOW.map(([k, label]) => ({brand: k, label, tag: ""}));
 const RANGE_LABEL = {1: "last 24 h", 7: "last 7 days", 30: "last 30 days", 0: "since tracking began"};
 const IDLE_MS = 20 * 60 * 1000;
 
@@ -83,8 +103,6 @@ function start() {
   $("app").hidden = false;
   ["pointermove", "keydown", "scroll", "touchstart"].forEach(ev => addEventListener(ev, poke, {passive: true}));
   poke();
-  $("platformChips").innerHTML = PLAT.map(p =>
-    `<button class="chip" data-k="${p.k}" aria-pressed="true"><i style="background:var(${p.c})"></i>${p.label}</button>`).join("");
   $("platformChips").onclick = e => {
     const b = e.target.closest(".chip"); if (!b) return;
     state.off.has(b.dataset.k) ? state.off.delete(b.dataset.k) : state.off.add(b.dataset.k);
@@ -159,7 +177,8 @@ function base() {
     grid: {left: 8, right: 24, top: 36, bottom: 16, containLabel: true},
     tooltip: {trigger: "axis", backgroundColor: css("--surface-1"), borderColor: css("--border"),
               textStyle: {color: css("--text-primary")}, axisPointer: {type: "line", lineStyle: {color: muted}}},
-    legend: {top: 0, left: 0, icon: "circle", itemWidth: 10, itemHeight: 10, textStyle: {color: css("--text-secondary")}},
+    legend: {top: 0, left: 0, icon: "circle", itemWidth: 10, itemHeight: 10, itemGap: 16, formatter: iconText,
+             textStyle: {color: css("--text-secondary"), rich: richIcons()}},
     xAxis: {axisLine: {lineStyle: {color: grid}}, axisTick: {show: false}, axisLabel: {color: muted}, splitLine: {show: false}},
     yAxis: {axisLine: {show: false}, splitLine: {lineStyle: {color: grid}}, axisLabel: {color: muted}},
   };
@@ -201,7 +220,8 @@ function renderMix() {
     ...o, legend: {show: false}, grid: {...o.grid, top: 8, right: 70},
     tooltip: {...o.tooltip, trigger: "item", formatter: d => `${d.name}: <b>${fmt(d.value)}</b> views (${fmt(d.value / all * 100)}%)`},
     xAxis: {...o.xAxis, type: "value", splitLine: {lineStyle: {color: css("--grid")}}},
-    yAxis: {...o.yAxis, type: "category", data: ps.map(p => p.label), splitLine: {show: false}, axisLabel: {color: css("--text-secondary")}},
+    yAxis: {...o.yAxis, type: "category", data: ps.map(p => p.label), splitLine: {show: false},
+            axisLabel: {color: css("--text-secondary"), formatter: iconText, rich: richIcons(18)}},
     series: [{type: "bar", barMaxWidth: 26, data: ps.map(p => ({value: tt[p.k], itemStyle: {color: css(p.c), borderRadius: [0, 4, 4, 0]}})),
               label: {show: true, position: "right", color: css("--text-secondary"), formatter: d => `${fmt(d.value)} · ${fmt(d.value / all * 100)}%`}}],
   }, true);
@@ -214,9 +234,11 @@ function renderFormat() {
   const metrics = [["tiktok", "TikTok views"], ["instagram_reel", "IG Reel views"]];
   const o = base();
   chart("cFormat").setOption({
-    ...o, grid: {...o.grid, top: 36},
+    ...o, grid: {...o.grid, top: 36}, legend: {...o.legend, formatter: n => n},
     tooltip: {...o.tooltip, trigger: "axis", axisPointer: {type: "shadow"}, valueFormatter: v => fmt(v) + " per cartoon"},
-    xAxis: {...o.xAxis, type: "category", data: metrics.map(m => m[1])},
+    xAxis: {...o.xAxis, type: "category", data: metrics.map(m => m[1]),
+            axisLabel: {...o.xAxis.axisLabel, rich: richIcons(18),
+                        formatter: v => v.startsWith("TikTok") ? "{i_tiktok|}" : "{i_instagram|}{tag|Reel}"}},
     yAxis: {...o.yAxis, type: "value"},
     series: [["living", "Living", "--living"], ["drawing", "Drawing", "--drawing"]].map(([k, label, c]) => ({
       name: `${label} (${groups[k].length})`, type: "bar", barMaxWidth: 40, barGap: "8%",
@@ -263,7 +285,7 @@ function renderBoard() {
   });
   const {key, asc} = state.sort;
   rows.sort((a, b) => ((key === "n" ? a.n - b.n : (a[key] ?? -1) - (b[key] ?? -1))) * (asc ? 1 : -1));
-  const cols = [["n", "Cartoon"], ...ps.map(p => [p.k, p.label]), ["total", "Total"], ["inter", "Interactions"],
+  const cols = [["n", "Cartoon"], ...ps.map(p => [p.k, iconHtml(p)]), ["total", "Total"], ["inter", "Interactions"],
                 ["change", "Change"], [null, "Trend"]];
   $("board").innerHTML = `<thead><tr>${cols.map(([k, l]) =>
       `<th ${k ? `data-k="${k}"` : ""} class="${k === key ? "sorted" + (asc ? " asc" : "") : ""}">${l}</th>`).join("")}</tr></thead><tbody>` +
@@ -314,12 +336,14 @@ function renderDetail() {
       const bits = [d.reach != null ? `reach ${fmt(d.reach)}` : "", inter(d) ? `${fmt(inter(d))} interactions` : "",
                     d.avg_watch_s ? `watch ${fmt(Math.min(d.avg_watch_s, 999), 1)} s` : "",
                     d.link_clicks ? `${fmt(d.link_clicks)} link clicks` : ""].filter(Boolean);
-      return line(p.label, d, bits.length ? ` <span class="muted">· ${bits.join(" · ")}</span>` : "");
+      return line(iconHtml(p), d, bits.length ? ` <span class="muted">· ${bits.join(" · ")}</span>` : "");
     }).join("");
 }
 
 // ---- everything ---------------------------------------------------------------------
 function renderAll() {
+  $("platformChips").innerHTML = PLAT.map(p =>   // rebuilt each time so the logos follow the theme
+    `<button class="chip" data-k="${p.k}" aria-pressed="true" aria-label="${p.label}"><i style="background:var(${p.c})"></i>${iconHtml(p)}</button>`).join("");
   document.querySelectorAll("#range button").forEach(b => b.classList.toggle("on", +b.dataset.r === state.range));
   document.querySelectorAll("#platformChips .chip").forEach(b => {
     b.classList.toggle("off", state.off.has(b.dataset.k)); b.setAttribute("aria-pressed", !state.off.has(b.dataset.k));
