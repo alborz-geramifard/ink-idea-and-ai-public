@@ -9,8 +9,8 @@
   --accent: #c8892b;      /* brand gold: UI only, never a series */
   --grid: #ece5d6;
   --good: #1f7a3a; --bad: #b3261e;
-  /* categorical slots 1-5 (reference palette, fixed order) */
-  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
+  /* videos = greens (TikTok, IG Reel), images = yellow (IG image), posts = blues (X, Threads) */
+  --s1: #1b7a3d; --s2: #52b96f; --s3: #d9a400; --s4: #1f5fbf; --s5: #6aa6ea;
   --living: #6250d6; --drawing: #8a8984;
 }
 @media (prefers-color-scheme: dark) {
@@ -19,7 +19,7 @@
     --surface-0: #121211; --surface-1: #1a1a19; --border: #2c2b28;
     --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8d85;
     --accent: #d9a24a; --grid: #2a2926; --good: #5cc97a; --bad: #ef8a83;
-    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+    --s1: #2f9e55; --s2: #86d69b; --s3: #e8b923; --s4: #3f7fdc; --s5: #97c6f4;
     --living: #9085e9; --drawing: #8f8d85;
   }
 }
@@ -28,7 +28,7 @@
   --surface-0: #121211; --surface-1: #1a1a19; --border: #2c2b28;
   --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8d85;
   --accent: #d9a24a; --grid: #2a2926; --good: #5cc97a; --bad: #ef8a83;
-  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+  --s1: #2f9e55; --s2: #86d69b; --s3: #e8b923; --s4: #3f7fdc; --s5: #97c6f4;
   --living: #9085e9; --drawing: #8f8d85;
 }
 
