@@ -220,7 +220,10 @@ function base() {
     yAxis: {axisLine: {show: false}, splitLine: {lineStyle: {color: grid}}, axisLabel: {color: muted}},
   };
 }
-const timeFmt = v => new Date(v).toLocaleString([], {month: "short", day: "numeric", hour: "numeric"});
+// time axes: the date where a day starts (shown bold by ECharts), times of day in between only when zoomed in
+const TIME_LABELS = {year: "{yyyy}", month: "{MMM} {d}", day: "{MMM} {d}", hour: "{HH}:{mm}", minute: "{HH}:{mm}", second: "{HH}:{mm}"};
+// over more than two days: dates only (one tick per day at most)
+const dayTicks = r => r.length > 1 && t(r[r.length - 1]) - t(r[0]) > 2 * 864e5 ? {minInterval: 864e5} : {};
 
 function renderTrend() {
   const r = inRange(), gain = state.mode === "gain", surface = css("--surface-1");
@@ -240,7 +243,7 @@ function renderTrend() {
     ...o, series,
     grid: {...o.grid, bottom: 52},
     tooltip: {...o.tooltip, valueFormatter: v => fmt(v)},
-    xAxis: {...o.xAxis, type: "time", axisLabel: {...o.xAxis.axisLabel, formatter: v => timeFmt(v)}},
+    xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
     dataZoom: [{type: "inside"}, {type: "slider", height: 20, bottom: 6, borderColor: "transparent",
                fillerColor: "rgba(200,137,43,.15)", dataBackground: {lineStyle: {color: css("--text-muted")}, areaStyle: {opacity: 0}},
@@ -293,7 +296,7 @@ function renderFollowers() {
   chart("cFollowers").setOption({
     ...o,
     tooltip: {...o.tooltip, valueFormatter: v => fmt(v)},
-    xAxis: {...o.xAxis, type: "time", axisLabel: {...o.xAxis.axisLabel, formatter: v => timeFmt(v)}},
+    xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
     series: FOLLOW.map(([k, label, c]) => ({
       name: label, type: "line", connectNulls: true, symbol: "circle", symbolSize: 8, showSymbol: r.length < 30,
@@ -356,7 +359,7 @@ function renderDetail() {
   chart("cDetail").setOption({
     ...o,
     tooltip: {...o.tooltip, valueFormatter: v => fmt(v)},
-    xAxis: {...o.xAxis, type: "time", axisLabel: {...o.xAxis.axisLabel, formatter: v => timeFmt(v)}},
+    xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
     series: on().filter(p => c[p.k]).map(p => ({
       name: p.label, type: "line", symbol: "circle", symbolSize: 8, showSymbol: r.length < 30, connectNulls: true,
