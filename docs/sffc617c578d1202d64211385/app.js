@@ -286,9 +286,15 @@ function renderFormat() {
       itemStyle: {color: css(c), borderRadius: [4, 4, 0, 0]},
       label: {show: true, position: "top", color: css("--text-secondary")}})),
   }, true);
-  const w = k => { const v = groups[k].map(c => c.instagram_reel && c.instagram_reel.avg_watch_s).filter(v => v > 0 && v < 60);
-                   return v.length ? fmt(v.reduce((a, b) => a + b, 0) / v.length, 1) + " s" : "–"; };
-  $("formatNote").textContent = `Avg Reel watch time: living ${w("living")}, drawing ${w("drawing")}. Newer posts have had less time to collect views.`;
+  const mean = (k, plat, field, unit, d) => {
+    const v = groups[k].map(c => c[plat] && c[plat][field]).filter(v => v != null && !(field === "avg_watch_s" && v >= 60));   // > 60 s = looping outlier
+    return v.length ? fmt(v.reduce((a, b) => a + b, 0) / v.length, d) + unit : "–";
+  };
+  $("formatNote").textContent =
+    `Avg watch time: TikTok living ${mean("living", "tiktok", "avg_watch_s", " s", 1)} vs drawing ${mean("drawing", "tiktok", "avg_watch_s", " s", 1)}; ` +
+    `IG Reel living ${mean("living", "instagram_reel", "avg_watch_s", " s", 1)} vs drawing ${mean("drawing", "instagram_reel", "avg_watch_s", " s", 1)}. ` +
+    `Watched to the end on TikTok: living ${mean("living", "tiktok", "completion_pct", "%", 1)} vs drawing ${mean("drawing", "tiktok", "completion_pct", "%", 1)}. ` +
+    `Newer posts have had less time to collect views.`;
 }
 
 function renderFollowers() {
@@ -375,6 +381,7 @@ function renderDetail() {
       const d = c[p.k]; if (!d) return "";
       const bits = [d.reach != null ? `reach ${fmt(d.reach)}` : "", inter(d) ? `${fmt(inter(d))} interactions` : "",
                     d.avg_watch_s ? `watch ${fmt(Math.min(d.avg_watch_s, 999), 1)} s` : "",
+                    d.completion_pct != null ? `${fmt(d.completion_pct, 1)}% watched to the end` : "",
                     d.link_clicks ? `${fmt(d.link_clicks)} link clicks` : ""].filter(Boolean);
       return line(iconHtml(p), d, bits.length ? ` <span class="muted">· ${bits.join(" · ")}</span>` : "");
     }).join("");
