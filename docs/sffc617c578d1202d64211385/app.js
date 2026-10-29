@@ -31,6 +31,8 @@ const iconHtml = p => `<img src="${logo(p.brand)}" alt="${esc(p.label)}" title="
   (p.tag ? `<span class="pltag">${p.tag}</span>` : "");
 const FOLLOW = [["tiktok", "TikTok", "--s1"], ["instagram", "Instagram", "--s2"], ["x", "X", "--s4"], ["threads", "Threads", "--s5"]];
 const FOLLOW_P = FOLLOW.map(([k, label]) => ({brand: k, label, tag: ""}));
+const ENG = [["likes", "Likes", "♥", "--e1"], ["comments", "Comments", "💬", "--e2"], ["shares", "Shares", "↗", "--e3"],
+             ["saves", "Saves", "🔖", "--e4"]];
 const RANGE_LABEL = {1: "last 24 h", 7: "last 7 days", 30: "last 30 days", 0: "since tracking began"};
 const SESSION_MS = 24 * 60 * 60 * 1000;
 const SESSION = "ink-session";
@@ -159,6 +161,8 @@ const latest = () => snaps()[snaps().length - 1];
 const on = () => PLAT.filter(p => !state.off.has(p.k));
 const views = (c, k) => (c && c[k] && c[k].views) || 0;
 const inter = d => d ? (d.likes || 0) + (d.comments || 0) + (d.shares || 0) + (d.saves || 0) : 0;
+const eng = (c, k) => on().reduce((a, p) => a + ((c && c[p.k] && c[p.k][k]) || 0), 0);   // one kind, enabled platforms
+const engAll = (s, k) => Object.values(s.cartoons).reduce((a, c) => a + eng(c, k), 0);
 
 function inRange() {
   const all = snaps();
@@ -311,6 +315,40 @@ function renderFollowers() {
   }, true);
 }
 
+// ---- engagement ------------------------------------------------------------------
+function renderEngTrend() {
+  const r = inRange(), o = base(), surface = css("--surface-1");
+  chart("cEngTrend").setOption({
+    ...o, legend: {...o.legend, formatter: n => n},
+    tooltip: {...o.tooltip, valueFormatter: v => fmt(v)},
+    xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
+    yAxis: {...o.yAxis, type: "value", minInterval: 1},
+    series: ENG.map(([k, l, ic, c]) => ({
+      name: `${ic} ${l}`, type: "line", step: "end", symbol: "circle", symbolSize: 8, showSymbol: r.length < 30,
+      data: r.map(s => [s.updated, engAll(s, k)]),
+      lineStyle: {width: 2}, itemStyle: {color: css(c), borderColor: surface, borderWidth: 2}, emphasis: {focus: "series"}})),
+  }, true);
+}
+
+function renderEngPosts() {
+  const cs = Object.entries(latest().cartoons).sort((a, b) => +a[0] - +b[0]), o = base(), surface = css("--surface-1");
+  const any = cs.some(([, c]) => ENG.some(([k]) => eng(c, k)));
+  chart("cEngPosts").setOption({
+    ...o, legend: {...o.legend, formatter: n => n},
+    tooltip: {...o.tooltip, axisPointer: {type: "shadow"},
+              formatter: ps => `<b>${ps[0].axisValueLabel}</b><br>` + ps.map(x => `${x.marker}${x.seriesName}: <b>${fmt(x.value)}</b>`).join("<br>")},
+    xAxis: {...o.xAxis, type: "category", data: cs.map(([n, c]) => `No. ${n}\n${c.title}`),
+            axisLabel: {...o.xAxis.axisLabel, interval: 0, fontSize: 11, lineHeight: 14}},
+    yAxis: {...o.yAxis, type: "value", minInterval: 1},
+    series: ENG.map(([k, l, ic, c], i) => ({
+      name: `${ic} ${l}`, type: "bar", stack: "eng", barMaxWidth: 34, data: cs.map(([, cc]) => eng(cc, k)),
+      itemStyle: {color: css(c), borderColor: surface, borderWidth: 1,
+                  borderRadius: i === ENG.length - 1 ? [4, 4, 0, 0] : 0}, emphasis: {focus: "series"}})),
+    graphic: any ? [] : [{type: "text", left: "center", top: "middle",
+      style: {text: "No likes, comments, shares or saves yet on the selected platforms.", fill: css("--text-muted"), fontSize: 13}}],
+  }, true);
+}
+
 // ---- leaderboard --------------------------------------------------------------------
 function spark(values) {
   if (values.length < 2) return `<span class="muted">·</span>`;
@@ -324,6 +362,7 @@ function renderBoard() {
   const r = inRange(), now = latest(), first = r.length > 1 ? r[0] : null, ps = on();
   const rows = Object.entries(now.cartoons).map(([n, c]) => {
     const row = {n: +n, c, total: cartoonViews(c), inter: ps.reduce((a, p) => a + inter(c[p.k]), 0)};
+    ENG.forEach(([k]) => { row[k] = eng(c, k); });
     ps.forEach(p => { row[p.k] = c[p.k] ? c[p.k].views : null; });
     row.change = first && first.cartoons[n] ? row.total - cartoonViews(first.cartoons[n]) : null;
     row.trend = r.map(s => s.cartoons[n] ? cartoonViews(s.cartoons[n]) : 0);
@@ -331,14 +370,14 @@ function renderBoard() {
   });
   const {key, asc} = state.sort;
   rows.sort((a, b) => ((key === "n" ? a.n - b.n : (a[key] ?? -1) - (b[key] ?? -1))) * (asc ? 1 : -1));
-  const cols = [["n", "Cartoon"], ...ps.map(p => [p.k, iconHtml(p)]), ["total", "Total"], ["inter", "Interactions"],
+  const cols = [["n", "Cartoon"], ...ps.map(p => [p.k, iconHtml(p)]), ["total", "Total"], ...ENG.map(([k, l, ic]) => [k, `<span title="${l}">${ic}</span>`]),
                 ["change", "Change"], [null, "Trend"]];
   $("board").innerHTML = `<thead><tr>${cols.map(([k, l]) =>
       `<th ${k ? `data-k="${k}"` : ""} class="${k === key ? "sorted" + (asc ? " asc" : "") : ""}">${l}</th>`).join("")}</tr></thead><tbody>` +
     rows.map(row => `<tr data-n="${row.n}" class="${row.n === state.sel ? "sel" : ""}">
       <td>No. ${row.n} · ${esc(row.c.title)}${row.c.format ? `<span class="badge ${row.c.format}">${row.c.format}</span>` : ""}</td>
       ${ps.map(p => `<td>${fmt(row[p.k])}</td>`).join("")}
-      <td><b>${fmt(row.total)}</b></td><td>${fmt(row.inter)}</td>
+      <td><b>${fmt(row.total)}</b></td>${ENG.map(([k]) => `<td class="${row[k] ? "" : "muted"}">${fmt(row[k])}</td>`).join("")}
       <td>${row.change == null ? `<span class="muted">–</span>` : delta(row.total, row.total - row.change)}</td>
       <td>${spark(row.trend)}</td></tr>`).join("") + "</tbody>";
   $("board").querySelector("thead").onclick = e => {
@@ -379,7 +418,7 @@ function renderDetail() {
   $("detailStats").innerHTML = `<p class="note">“${esc(c.caption)}”${c.format ? ` · ${c.format} video` : ""}</p>` +
     PLAT.map(p => {
       const d = c[p.k]; if (!d) return "";
-      const bits = [d.reach != null ? `reach ${fmt(d.reach)}` : "", inter(d) ? `${fmt(inter(d))} interactions` : "",
+      const bits = [d.reach != null ? `reach ${fmt(d.reach)}` : "", inter(d) ? ENG.filter(([k]) => d[k]).map(([k, l, ic]) => `${ic} ${fmt(d[k])}`).join(" ") : "",
                     d.avg_watch_s ? `watch ${fmt(Math.min(d.avg_watch_s, 999), 1)} s` : "",
                     d.completion_pct != null ? `${fmt(d.completion_pct, 1)}% watched to the end` : "",
                     d.link_clicks ? `${fmt(d.link_clicks)} link clicks` : ""].filter(Boolean);
@@ -399,5 +438,5 @@ function renderAll() {
   $("updated").textContent = `Updated ${new Date(now.updated).toLocaleString([], {dateStyle: "medium", timeStyle: "short"})}` +
     ` · ${snaps().length} snapshot${snaps().length === 1 ? "" : "s"} since ${new Date(snaps()[0].updated).toLocaleDateString([], {month: "short", day: "numeric"})}` +
     (errs.length ? ` · couldn't refresh: ${errs.join(", ")}` : "");
-  renderTiles(); renderTrend(); renderMix(); renderFormat(); renderBoard(); renderDetail(); renderFollowers();
+  renderTiles(); renderTrend(); renderEngTrend(); renderEngPosts(); renderMix(); renderFormat(); renderBoard(); renderDetail(); renderFollowers();
 }
