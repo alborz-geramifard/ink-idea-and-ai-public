@@ -7,7 +7,7 @@
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
 <title>Ink Stats</title>
-<link rel="stylesheet" href="dash.css?v=4">
+<link rel="stylesheet" href="dash.css?v=5">
 </head>
 <body>
 <!-- Sign in: the page holds no data; data.json is AES-256-GCM, key = PBKDF2(username + password) -->
@@ -44,6 +44,16 @@
       <div class="chart" id="cTrend"></div>
     </article>
 
+    <article class="card wide">
+      <div class="card-h"><h2>Engagement over time</h2><span class="note">likes, comments, shares and saves, all posts</span></div>
+      <div class="chart short" id="cEngTrend"></div>
+    </article>
+
+    <article class="card wide">
+      <div class="card-h"><h2>Engagement per cartoon</h2><span class="note">latest totals; hover a bar for the breakdown</span></div>
+      <div class="chart short" id="cEngPosts"></div>
+    </article>
+
     <article class="card">
       <div class="card-h"><h2>Where the views come from</h2></div>
       <div class="chart short" id="cMix"></div>
@@ -78,6 +88,6 @@
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
-<script src="app.js?v=7"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>
