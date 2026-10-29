@@ -31,7 +31,7 @@ const iconHtml = p => `<img src="${logo(p.brand)}" alt="${esc(p.label)}" title="
   (p.tag ? `<span class="pltag">${p.tag}</span>` : "");
 const FOLLOW = [["tiktok", "TikTok", "--s1"], ["instagram", "Instagram", "--s2"], ["x", "X", "--s4"], ["threads", "Threads", "--s5"]];
 const FOLLOW_P = FOLLOW.map(([k, label]) => ({brand: k, label, tag: ""}));
-const ENG = [["likes", "Likes", "♥", "--e1"], ["comments", "Comments", "💬", "--e2"], ["shares", "Shares", "↗", "--e3"],
+const ENG = [["likes", "Likes", "👍", "--e1"], ["comments", "Comments", "💬", "--e2"], ["shares", "Shares", "↗", "--e3"],
              ["saves", "Saves", "🔖", "--e4"]];
 const RANGE_LABEL = {1: "last 24 h", 7: "last 7 days", 30: "last 30 days", 0: "since tracking began"};
 const SESSION_MS = 24 * 60 * 60 * 1000;
