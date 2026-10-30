@@ -32,7 +32,7 @@ const iconHtml = p => `<img src="${logo(p.brand)}" alt="${esc(p.label)}" title="
 const FOLLOW = [["tiktok", "TikTok", "--s1"], ["instagram", "Instagram", "--s2"], ["x", "X", "--s4"], ["threads", "Threads", "--s5"]];
 const FOLLOW_P = FOLLOW.map(([k, label]) => ({brand: k, label, tag: ""}));
 const ENG = [["likes", "Likes", "👍", "--e1"], ["comments", "Comments", "💬", "--e2"], ["shares", "Shares", "↗", "--e3"],
-             ["saves", "Saves", "🔖", "--e4"]];
+             ["saves", "Saves", "🔖", "--e4"], ["new_followers", "New followers", "👤", "--e5"]];
 const RANGE_LABEL = {1: "last 24 h", 7: "last 7 days", 30: "last 30 days", 0: "since tracking began"};
 const SESSION_MS = 24 * 60 * 60 * 1000;
 const SESSION = "ink-session";
@@ -324,8 +324,8 @@ function renderEngTrend() {
     xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
     series: ENG.map(([k, l, ic, c]) => ({
-      name: `${ic} ${l}`, type: "line", step: "end", symbol: "circle", symbolSize: 8, showSymbol: r.length < 30,
-      data: r.map(s => [s.updated, engAll(s, k)]),
+      name: k === "new_followers" ? `${ic} Followers (all platforms)` : `${ic} ${l}`, type: "line", step: "end", symbol: "circle", symbolSize: 8, showSymbol: r.length < 30,
+      data: r.map(s => [s.updated, k === "new_followers" ? allFollowers(s) : engAll(s, k)]),
       lineStyle: {width: 2}, itemStyle: {color: css(c), borderColor: surface, borderWidth: 2}, emphasis: {focus: "series"}})),
   }, true);
 }
