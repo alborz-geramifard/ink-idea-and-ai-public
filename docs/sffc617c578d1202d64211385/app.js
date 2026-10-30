@@ -185,16 +185,37 @@ const rate = c => { const v = cartoonViews(c); const i = on().reduce((a, p) => a
 const watch = (c, k) => { const v = c[k] && c[k].avg_watch_s; return v > 0 && v < 60 ? v : null; };
 const thumb = (n, cls = "thumb") => `<img src="thumbs/${+n}.jpg" data-big="thumbs/${+n}-lg.jpg" class="${cls}" alt="" loading="lazy">`;
 
-// hover a thumbnail: show the cartoon large next to the pointer
+// hover a thumbnail: show the cartoon large next to the pointer. The large files are preloaded; until one
+// is ready the small thumbnail is shown scaled up, so the box is never empty or showing the previous cartoon.
 const preview = document.createElement("img");
-preview.className = "preview"; preview.alt = ""; preview.hidden = true;
+preview.className = "ink-zoom"; preview.alt = ""; preview.hidden = true;
 document.body.appendChild(preview);
+const bigCache = {};
+function preloadBig() {
+  document.querySelectorAll("img.thumb").forEach(t => {
+    const src = t.dataset.big;
+    if (src && !bigCache[src]) { const im = new Image(); im.decoding = "async"; im.src = src; bigCache[src] = im; }
+  });
+}
+let hovering = null;
 document.addEventListener("mouseover", e => {
   const t = e.target.closest && e.target.closest("img.thumb");
-  if (!t) return;
-  preview.src = t.dataset.big; preview.hidden = false;
+  if (!t || t === hovering) return;
+  hovering = t;
+  const big = bigCache[t.dataset.big];
+  if (big && big.complete && big.naturalWidth) {
+    preview.src = big.src;
+  } else {
+    preview.src = t.currentSrc || t.src;           // instant placeholder
+    const im = big || (bigCache[t.dataset.big] = Object.assign(new Image(), {src: t.dataset.big}));
+    im.addEventListener("load", () => { if (hovering === t) preview.src = im.src; }, {once: true});
+  }
+  preview.hidden = false;
 });
-document.addEventListener("mouseout", e => { if (e.target.closest && e.target.closest("img.thumb")) preview.hidden = true; });
+document.addEventListener("mouseout", e => {
+  const t = e.target.closest && e.target.closest("img.thumb");
+  if (t && !(e.relatedTarget && t.contains(e.relatedTarget))) { hovering = null; preview.hidden = true; }
+});
 document.addEventListener("mousemove", e => {
   if (preview.hidden) return;
   const w = 270, h = 480, pad = 16;
@@ -491,4 +512,5 @@ function renderAll() {
     ` · ${snaps().length} snapshot${snaps().length === 1 ? "" : "s"} since ${new Date(snaps()[0].updated).toLocaleDateString([], {month: "short", day: "numeric"})}` +
     (errs.length ? ` · couldn't refresh: ${errs.join(", ")}` : "");
   renderChanges(); renderTiles(); renderTrend(); renderEngTrend(); renderEngPosts(); renderMix(); renderBoard(); renderDetail(); renderComments();
+  preloadBig();
 }
