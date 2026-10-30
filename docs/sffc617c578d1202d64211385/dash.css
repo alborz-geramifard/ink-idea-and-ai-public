@@ -110,3 +110,12 @@ footer { margin-top: 20px; font-size: 12px; text-align: center; }
 img.pl { width: 16px; height: 16px; vertical-align: -3px; }
 .pltag { font-size: 11px; color: var(--text-secondary); margin-left: 3px; text-transform: none; letter-spacing: 0; }
 .board th img.pl { width: 15px; height: 15px; }
+
+/* comments */
+.cm-list { display: grid; gap: 10px; max-height: 420px; overflow-y: auto; }
+.cm { border: 1px solid var(--grid); border-radius: 10px; padding: 10px 12px; }
+.cm-h { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; }
+.cm-h a { margin-left: auto; color: var(--text-secondary); }
+.cm-cartoon { color: var(--text-secondary); }
+.cm-t { margin-top: 4px; font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cm-head { font-size: 14px; margin: 10px 0 2px; font-family: inherit; }
