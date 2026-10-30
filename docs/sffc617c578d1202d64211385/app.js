@@ -271,36 +271,6 @@ function renderMix() {
   }, true);
 }
 
-function renderFormat() {
-  const cs = Object.values(latest().cartoons);
-  const groups = {living: cs.filter(c => c.format === "living"), drawing: cs.filter(c => c.format === "drawing")};
-  const avg = (list, k) => list.length ? list.reduce((a, c) => a + views(c, k), 0) / list.length : 0;
-  const metrics = [["tiktok", "TikTok views"], ["instagram_reel", "IG Reel views"]];
-  const o = base();
-  chart("cFormat").setOption({
-    ...o, grid: {...o.grid, top: 36}, legend: {...o.legend, formatter: n => n},
-    tooltip: {...o.tooltip, trigger: "axis", axisPointer: {type: "shadow"}, valueFormatter: v => fmt(v) + " per cartoon"},
-    xAxis: {...o.xAxis, type: "category", data: metrics.map(m => m[1]),
-            axisLabel: {...o.xAxis.axisLabel, rich: richIcons(18),
-                        formatter: v => v.startsWith("TikTok") ? "{i_tiktok|}" : "{i_instagram|}{tag|Reel}"}},
-    yAxis: {...o.yAxis, type: "value"},
-    series: [["living", "Living", "--living"], ["drawing", "Drawing", "--drawing"]].map(([k, label, c]) => ({
-      name: `${label} (${groups[k].length})`, type: "bar", barMaxWidth: 40, barGap: "8%",
-      data: metrics.map(m => Math.round(avg(groups[k], m[0]))),
-      itemStyle: {color: css(c), borderRadius: [4, 4, 0, 0]},
-      label: {show: true, position: "top", color: css("--text-secondary")}})),
-  }, true);
-  const mean = (k, plat, field, unit, d) => {
-    const v = groups[k].map(c => c[plat] && c[plat][field]).filter(v => v != null && !(field === "avg_watch_s" && v >= 60));   // > 60 s = looping outlier
-    return v.length ? fmt(v.reduce((a, b) => a + b, 0) / v.length, d) + unit : "–";
-  };
-  $("formatNote").textContent =
-    `Avg watch time: TikTok living ${mean("living", "tiktok", "avg_watch_s", " s", 1)} vs drawing ${mean("drawing", "tiktok", "avg_watch_s", " s", 1)}; ` +
-    `IG Reel living ${mean("living", "instagram_reel", "avg_watch_s", " s", 1)} vs drawing ${mean("drawing", "instagram_reel", "avg_watch_s", " s", 1)}. ` +
-    `Watched to the end on TikTok: living ${mean("living", "tiktok", "completion_pct", "%", 1)} vs drawing ${mean("drawing", "tiktok", "completion_pct", "%", 1)}. ` +
-    `Newer posts have had less time to collect views.`;
-}
-
 // ---- engagement ------------------------------------------------------------------
 function renderEngTrend() {
   const r = inRange(), o = base(), surface = css("--surface-1");
@@ -426,5 +396,5 @@ function renderAll() {
   $("updated").textContent = `Updated ${new Date(now.updated).toLocaleString([], {dateStyle: "medium", timeStyle: "short"})}` +
     ` · ${snaps().length} snapshot${snaps().length === 1 ? "" : "s"} since ${new Date(snaps()[0].updated).toLocaleDateString([], {month: "short", day: "numeric"})}` +
     (errs.length ? ` · couldn't refresh: ${errs.join(", ")}` : "");
-  renderTiles(); renderTrend(); renderEngTrend(); renderEngPosts(); renderMix(); renderFormat(); renderBoard(); renderDetail();
+  renderTiles(); renderTrend(); renderEngTrend(); renderEngPosts(); renderMix(); renderBoard(); renderDetail();
 }
