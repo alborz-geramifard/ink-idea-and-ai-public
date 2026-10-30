@@ -180,10 +180,42 @@ const allViews = s => { const tt = totals(s); return on().reduce((a, p) => a + t
 const allInter = s => Object.values(s.cartoons).reduce((a, c) => a + on().reduce((b, p) => b + inter(c[p.k]), 0), 0);
 const allFollowers = s => Object.values(s.followers || {}).reduce((a, v) => a + (v || 0), 0);
 const cartoonViews = c => on().reduce((a, p) => a + views(c, p.k), 0);
+const postedAt = c => ["instagram_image", "instagram_reel"].map(k => c[k] && c[k].posted_at).filter(Boolean).sort()[0];
+const rate = c => { const v = cartoonViews(c); const i = on().reduce((a, p) => a + inter(c[p.k]), 0); return v ? i / v * 100 : null; };
+const watch = (c, k) => { const v = c[k] && c[k].avg_watch_s; return v > 0 && v < 60 ? v : null; };
+const thumb = (n, cls = "thumb") => `<img src="thumbs/${+n}.jpg" class="${cls}" alt="" loading="lazy">`;
+
 function reelWatch(s) {   // median Reel watch time; > 60 s is a looping outlier, not real watching
   const w = Object.values(s.cartoons).map(c => c.instagram_reel && c.instagram_reel.avg_watch_s)
     .filter(v => v > 0 && v < 60).sort((a, b) => a - b);
   return w.length ? w[Math.floor(w.length / 2)] : null;
+}
+
+// ---- what changed (last 24 h) --------------------------------------------------------
+function renderChanges() {
+  const all = snaps(), now = latest(), from = t(now) - 864e5;
+  const base = all.find(s => t(s) >= from) || all[0];
+  const lines = [];
+  if (base === now) { $("changes").innerHTML = `<p class="note">Changes appear after the next refresh.</p>`; return; }
+  const dv = allViews(now) - allViews(base);
+  const moves = [];
+  for (const [n, c] of Object.entries(now.cartoons)) for (const p of on()) {
+    const d = views(c, p.k) - views(base.cartoons[n], p.k);
+    if (d > 0) moves.push([d, n, p]);
+  }
+  moves.sort((a, b) => b[0] - a[0]);
+  if (dv) lines.push(`👀 <b>${dv > 0 ? "+" : ""}${fmt(dv)} views</b>` +
+    (moves.length ? ` · top: ${moves.slice(0, 3).map(([d, n, p]) => `No. ${n} ${iconHtml(p)} <b>+${fmt(d)}</b>`).join(" · ")}` : ""));
+  const eng = ENG.filter(([k]) => k !== "new_followers").map(([k, l, ic]) => [ic, engAll(now, k) - engAll(base, k)]).filter(([, d]) => d);
+  if (eng.length) lines.push(`💬 Engagement: ${eng.map(([ic, d]) => `${ic} <b>${d > 0 ? "+" : ""}${d}</b>`).join(" · ")}`);
+  const df = allFollowers(now) - allFollowers(base);
+  if (df) lines.push(`👤 Followers <b>${fmt(allFollowers(base))} → ${fmt(allFollowers(now))}</b>`);
+  const fresh = commentList().filter(c => new Date(c.at).getTime() >= t(base));
+  if (fresh.length) lines.push(`🗨️ <b>${fresh.length} new comment${fresh.length > 1 ? "s" : ""}</b>: ` +
+    fresh.slice(0, 2).map(c => `@${esc(c.user)} on No. ${c.n}: “${esc(c.text.slice(0, 60))}”`).join(" · "));
+  const posted = Object.entries(now.cartoons).filter(([, c]) => postedAt(c) && new Date(postedAt(c)).getTime() >= t(base));
+  if (posted.length) lines.push(`🆕 Posted: ${posted.map(([n, c]) => `No. ${n} · ${esc(c.title)}`).join(", ")}`);
+  $("changes").innerHTML = lines.length ? lines.map(l => `<div class="chg">${l}</div>`).join("") : `<p class="note">Quiet: nothing changed in the last 24 hours.</p>`;
 }
 
 // ---- tiles --------------------------------------------------------------------------
@@ -242,6 +274,14 @@ function renderTrend() {
          lineStyle: {width: 2}, itemStyle: {color: css(p.c), borderColor: surface, borderWidth: 2},
          emphasis: {focus: "series"}};
   });
+  const lo = t(r[0]), hi = t(latest());
+  const flags = Object.entries(latest().cartoons).map(([n, c]) => [n, postedAt(c)])
+    .filter(([, at]) => at && new Date(at).getTime() >= lo && new Date(at).getTime() <= hi);
+  if (series.length && flags.length) series[0].markLine = {
+    symbol: "none", silent: true, animation: false,
+    lineStyle: {color: css("--text-muted"), type: "dashed", width: 1},
+    label: {formatter: d => d.name, position: "insideEndTop", color: css("--text-secondary"), fontSize: 11},
+    data: flags.map(([n, at]) => ({name: `No. ${n}`, xAxis: at}))};
   const o = base();
   chart("cTrend").setOption({
     ...o, series,
@@ -347,6 +387,8 @@ function renderBoard() {
   const rows = Object.entries(now.cartoons).map(([n, c]) => {
     const row = {n: +n, c, total: cartoonViews(c), inter: ps.reduce((a, p) => a + inter(c[p.k]), 0)};
     ENG.forEach(([k]) => { row[k] = eng(c, k); });
+    row.rate = rate(c); row.tw = watch(c, "tiktok"); row.rw = watch(c, "instagram_reel");
+    row.tc = c.tiktok && c.tiktok.completion_pct != null ? c.tiktok.completion_pct : null;
     ps.forEach(p => { row[p.k] = c[p.k] ? c[p.k].views : null; });
     row.change = first && first.cartoons[n] ? row.total - cartoonViews(first.cartoons[n]) : null;
     row.trend = r.map(s => s.cartoons[n] ? cartoonViews(s.cartoons[n]) : 0);
@@ -355,13 +397,19 @@ function renderBoard() {
   const {key, asc} = state.sort;
   rows.sort((a, b) => ((key === "n" ? a.n - b.n : (a[key] ?? -1) - (b[key] ?? -1))) * (asc ? 1 : -1));
   const cols = [["n", "Cartoon"], ...ps.map(p => [p.k, iconHtml(p)]), ["total", "Total"], ...ENG.map(([k, l, ic]) => [k, `<span title="${l}">${ic}</span>`]),
+                ["rate", `<span title="Engagement rate: interactions per 100 views">Eng %</span>`],
+                ["tw", `<span title="TikTok average watch time">⏱ ${iconHtml(PLAT[0])}</span>`],
+                ["tc", `<span title="TikTok: watched to the end">✓ ${iconHtml(PLAT[0])}</span>`],
+                ["rw", `<span title="Instagram Reel average watch time">⏱ ${iconHtml(PLAT[1])}</span>`],
                 ["change", "Change"], [null, "Trend"]];
   $("board").innerHTML = `<thead><tr>${cols.map(([k, l]) =>
       `<th ${k ? `data-k="${k}"` : ""} class="${k === key ? "sorted" + (asc ? " asc" : "") : ""}">${l}</th>`).join("")}</tr></thead><tbody>` +
     rows.map(row => `<tr data-n="${row.n}" class="${row.n === state.sel ? "sel" : ""}">
-      <td>No. ${row.n} · ${esc(row.c.title)}${row.c.format ? `<span class="badge ${row.c.format}">${row.c.format}</span>` : ""}</td>
+      <td><div class="cell-cartoon">${thumb(row.n)}<span>No. ${row.n} · ${esc(row.c.title)}${row.c.format ? `<span class="badge ${row.c.format}">${row.c.format}</span>` : ""}</span></div></td>
       ${ps.map(p => `<td>${fmt(row[p.k])}</td>`).join("")}
       <td><b>${fmt(row.total)}</b></td>${ENG.map(([k]) => `<td class="${row[k] ? "" : "muted"}">${fmt(row[k])}</td>`).join("")}
+      <td>${row.rate == null ? "–" : fmt(row.rate, 1) + "%"}</td><td>${row.tw == null ? "–" : fmt(row.tw, 1) + " s"}</td>
+      <td>${row.tc == null ? "–" : fmt(row.tc, 1) + "%"}</td><td>${row.rw == null ? "–" : fmt(row.rw, 1) + " s"}</td>
       <td>${row.change == null ? `<span class="muted">–</span>` : delta(row.total, row.total - row.change)}</td>
       <td>${spark(row.trend)}</td></tr>`).join("") + "</tbody>";
   $("board").querySelector("thead").onclick = e => {
@@ -382,7 +430,7 @@ function renderDetail() {
   const n = state.sel, c = n && latest().cartoons[n];
   $("detail").hidden = !c;
   if (!c) return;
-  $("detailTitle").textContent = `No. ${n} · ${c.title}`;
+  $("detailTitle").innerHTML = `${thumb(n, "thumb lg")}No. ${n} · ${esc(c.title)}`;
   const r = inRange(), o = base(), surface = css("--surface-1");
   chart("cDetail").resize();
   chart("cDetail").setOption({
@@ -423,5 +471,5 @@ function renderAll() {
   $("updated").textContent = `Updated ${new Date(now.updated).toLocaleString([], {dateStyle: "medium", timeStyle: "short"})}` +
     ` · ${snaps().length} snapshot${snaps().length === 1 ? "" : "s"} since ${new Date(snaps()[0].updated).toLocaleDateString([], {month: "short", day: "numeric"})}` +
     (errs.length ? ` · couldn't refresh: ${errs.join(", ")}` : "");
-  renderTiles(); renderTrend(); renderEngTrend(); renderEngPosts(); renderMix(); renderBoard(); renderDetail(); renderComments();
+  renderChanges(); renderTiles(); renderTrend(); renderEngTrend(); renderEngPosts(); renderMix(); renderBoard(); renderDetail(); renderComments();
 }
