@@ -183,7 +183,26 @@ const cartoonViews = c => on().reduce((a, p) => a + views(c, p.k), 0);
 const postedAt = c => ["instagram_image", "instagram_reel"].map(k => c[k] && c[k].posted_at).filter(Boolean).sort()[0];
 const rate = c => { const v = cartoonViews(c); const i = on().reduce((a, p) => a + inter(c[p.k]), 0); return v ? i / v * 100 : null; };
 const watch = (c, k) => { const v = c[k] && c[k].avg_watch_s; return v > 0 && v < 60 ? v : null; };
-const thumb = (n, cls = "thumb") => `<img src="thumbs/${+n}.jpg" class="${cls}" alt="" loading="lazy">`;
+const thumb = (n, cls = "thumb") => `<img src="thumbs/${+n}.jpg" data-big="thumbs/${+n}-lg.jpg" class="${cls}" alt="" loading="lazy">`;
+
+// hover a thumbnail: show the cartoon large next to the pointer
+const preview = document.createElement("img");
+preview.className = "preview"; preview.alt = ""; preview.hidden = true;
+document.body.appendChild(preview);
+document.addEventListener("mouseover", e => {
+  const t = e.target.closest && e.target.closest("img.thumb");
+  if (!t) return;
+  preview.src = t.dataset.big; preview.hidden = false;
+});
+document.addEventListener("mouseout", e => { if (e.target.closest && e.target.closest("img.thumb")) preview.hidden = true; });
+document.addEventListener("mousemove", e => {
+  if (preview.hidden) return;
+  const w = 270, h = 480, pad = 16;
+  let x = e.clientX + pad, y = e.clientY - h / 2;
+  if (x + w > innerWidth - 8) x = e.clientX - w - pad;
+  y = Math.max(8, Math.min(y, innerHeight - h - 8));
+  preview.style.left = x + "px"; preview.style.top = y + "px";
+});
 
 function reelWatch(s) {   // median Reel watch time; > 60 s is a looping outlier, not real watching
   const w = Object.values(s.cartoons).map(c => c.instagram_reel && c.instagram_reel.avg_watch_s)
