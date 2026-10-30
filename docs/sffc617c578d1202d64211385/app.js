@@ -400,17 +400,20 @@ function commentList(only) {   // newest first, enabled platforms; only = one ca
     if (!only || +n === only) cs.forEach(c => all.push({...c, n: +n}));
   return all.filter(c => !state.off.has(c.platform)).sort((a, b) => b.at.localeCompare(a.at));
 }
-function commentHtml(c, withCartoon) {
+function commentHtml(c, withCartoon, reply) {
   const p = PLAT.find(x => x.k === c.platform);
+  const thread = (c.thread || []).map(r => commentHtml({...r, n: c.n}, false, true)).join("");
+  const needs = !reply && !c.ours && !(c.thread || []).some(r => r.ours);
   const title = withCartoon ? `<span class="cm-cartoon">No. ${c.n} · ${esc((latest().cartoons[c.n] || {}).title || "")}</span>` : "";
   const link = c.url && /^https:\/\//.test(c.url) ? `<a href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">reply ↗</a>` : "";
-  return `<div class="cm"><div class="cm-h">${p ? iconHtml(p) : ""}<b>@${esc(c.user)}</b>${title}
-    <span class="muted">${ago(c.at)}${c.likes ? ` · 👍 ${fmt(c.likes)}` : ""}${c.replies ? ` · ${fmt(c.replies)} replies` : ""}</span>${link}</div>
-    <div class="cm-t">${esc(c.text)}</div></div>`;
+  return `<div class="cm${reply ? " cm-reply" : ""}${c.ours ? " cm-ours" : ""}"><div class="cm-h">${p ? iconHtml(p) : ""}<b>@${esc(c.user)}</b>${c.ours ? `<span class="badge">you</span>` : ""}${needs ? `<span class="badge cm-needs">needs a reply</span>` : ""}${title}
+    <span class="muted">${ago(c.at)}${c.likes ? ` · 👍 ${fmt(c.likes)}` : ""}</span>${link}</div>
+    <div class="cm-t">${esc(c.text)}</div>${thread}</div>`;
 }
 function renderComments() {
   const cs = commentList();
-  $("commentCount").textContent = cs.length ? `${cs.length} comment${cs.length === 1 ? "" : "s"}` : "";
+  const nr = cs.reduce((a, c) => a + (c.thread || []).length, 0);
+  $("commentCount").textContent = cs.length ? `${cs.length} comment${cs.length === 1 ? "" : "s"}${nr ? ` · ${nr} repl${nr === 1 ? "y" : "ies"}` : ""}` : "";
   $("comments").innerHTML = cs.length ? cs.map(c => commentHtml(c, true)).join("")
     : `<p class="note">No comments yet on the selected platforms. (X replies aren't collected; Threads needs one more permission.)</p>`;
 }
