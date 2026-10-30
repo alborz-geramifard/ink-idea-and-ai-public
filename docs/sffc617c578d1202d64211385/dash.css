@@ -151,6 +151,6 @@ img.pl { width: 16px; height: 16px; vertical-align: -3px; }
 }
 
 .thumb { cursor: zoom-in; }
-.preview { position: fixed; z-index: 50; width: 270px; height: 480px; object-fit: contain; background: var(--surface-1);
+.ink-zoom { position: fixed; z-index: 50; width: 270px; height: 480px; object-fit: contain; background: var(--surface-1);
            border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.25); pointer-events: none; }
-@media (hover: none) { .preview { display: none; } }
+@media (hover: none) { .ink-zoom { display: none; } }
