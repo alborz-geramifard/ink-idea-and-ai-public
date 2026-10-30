@@ -154,3 +154,6 @@ img.pl { width: 16px; height: 16px; vertical-align: -3px; }
 .ink-zoom { position: fixed; z-index: 50; width: 270px; height: 480px; object-fit: contain; background: var(--surface-1);
            border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.25); pointer-events: none; }
 @media (hover: none) { .ink-zoom { display: none; } }
+.cm-reply { margin: 8px 0 0 18px; border-left: 3px solid var(--grid); border-radius: 0 8px 8px 0; background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.cm-ours > .cm-h b { color: var(--accent); }
+.cm-needs { border-color: var(--bad); color: var(--bad); }
