@@ -301,20 +301,6 @@ function renderFormat() {
     `Newer posts have had less time to collect views.`;
 }
 
-function renderFollowers() {
-  const r = inRange(), o = base(), surface = css("--surface-1");
-  chart("cFollowers").setOption({
-    ...o,
-    tooltip: {...o.tooltip, valueFormatter: v => fmt(v)},
-    xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
-    yAxis: {...o.yAxis, type: "value", minInterval: 1},
-    series: FOLLOW.map(([k, label, c]) => ({
-      name: label, type: "line", connectNulls: true, symbol: "circle", symbolSize: 8, showSymbol: r.length < 30,
-      data: r.map(s => [s.updated, (s.followers || {})[k] ?? null]),
-      lineStyle: {width: 2}, itemStyle: {color: css(c), borderColor: surface, borderWidth: 2}})),
-  }, true);
-}
-
 // ---- engagement ------------------------------------------------------------------
 function renderEngTrend() {
   const r = inRange(), o = base(), surface = css("--surface-1");
@@ -331,7 +317,9 @@ function renderEngTrend() {
 }
 
 function renderEngPosts() {
-  const cs = Object.entries(latest().cartoons).sort((a, b) => +a[0] - +b[0]), o = base(), surface = css("--surface-1");
+  const total = c => ENG.reduce((a, [k]) => a + eng(c, k), 0);
+  const cs = Object.entries(latest().cartoons).sort((a, b) => total(b[1]) - total(a[1]) || +a[0] - +b[0]),   // most engaged first
+        o = base(), surface = css("--surface-1");
   const any = cs.some(([, c]) => ENG.some(([k]) => eng(c, k)));
   chart("cEngPosts").setOption({
     ...o, legend: {...o.legend, formatter: n => n},
@@ -438,5 +426,5 @@ function renderAll() {
   $("updated").textContent = `Updated ${new Date(now.updated).toLocaleString([], {dateStyle: "medium", timeStyle: "short"})}` +
     ` · ${snaps().length} snapshot${snaps().length === 1 ? "" : "s"} since ${new Date(snaps()[0].updated).toLocaleDateString([], {month: "short", day: "numeric"})}` +
     (errs.length ? ` · couldn't refresh: ${errs.join(", ")}` : "");
-  renderTiles(); renderTrend(); renderEngTrend(); renderEngPosts(); renderMix(); renderFormat(); renderBoard(); renderDetail(); renderFollowers();
+  renderTiles(); renderTrend(); renderEngTrend(); renderEngPosts(); renderMix(); renderFormat(); renderBoard(); renderDetail();
 }
