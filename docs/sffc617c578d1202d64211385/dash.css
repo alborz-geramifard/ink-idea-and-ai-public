@@ -119,3 +119,33 @@ img.pl { width: 16px; height: 16px; vertical-align: -3px; }
 .cm-cartoon { color: var(--text-secondary); }
 .cm-t { margin-top: 4px; font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .cm-head { font-size: 14px; margin: 10px 0 2px; font-family: inherit; }
+
+/* what changed */
+.changes-card { margin-bottom: 14px; }
+.chg { padding: 5px 0; border-bottom: 1px solid var(--grid); font-size: 14px; }
+.chg:last-child { border-bottom: 0; }
+.chg img.pl { width: 14px; height: 14px; vertical-align: -2px; }
+
+/* thumbnails */
+.cell-cartoon { display: flex; align-items: center; gap: 10px; }
+.thumb { width: 30px; height: 53px; object-fit: cover; border-radius: 4px; border: 1px solid var(--grid); flex: none; }
+.thumb.lg { width: 40px; height: 71px; vertical-align: middle; margin-right: 10px; }
+
+/* phone */
+@media (max-width: 640px) {
+  main { padding: 12px 10px 30px; }
+  h1 { font-size: 19px; } h2 { font-size: 16px; }
+  .top { flex-direction: column; align-items: stretch; gap: 10px; }
+  .controls { justify-content: space-between; }
+  .seg button { padding: 6px 8px; }
+  .tiles { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .tile { padding: 10px 12px; }
+  .tile .v { font-size: 24px; }
+  .card { padding: 12px; border-radius: 12px; }
+  .chart, .chart.short { height: 240px; }
+  .board { font-size: 13px; }
+  .board th, .board td { padding: 7px 6px; }
+  .board th:first-child, .board td:first-child { position: sticky; left: 0; background: var(--surface-1); z-index: 1; min-width: 150px; }
+  .thumb { width: 24px; height: 43px; }
+  .cm-list { max-height: 360px; }
+}
