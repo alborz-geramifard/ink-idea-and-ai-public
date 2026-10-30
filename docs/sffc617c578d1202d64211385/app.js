@@ -307,6 +307,32 @@ function renderEngPosts() {
   }, true);
 }
 
+// ---- comments --------------------------------------------------------------------
+const ago = iso => {
+  const m = Math.max(0, (Date.now() - new Date(iso).getTime()) / 60000);
+  return m < 60 ? `${Math.round(m)} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`;
+};
+function commentList(only) {   // newest first, enabled platforms; only = one cartoon id
+  const all = [];
+  for (const [n, cs] of Object.entries((DATA && DATA.comments) || {}))
+    if (!only || +n === only) cs.forEach(c => all.push({...c, n: +n}));
+  return all.filter(c => !state.off.has(c.platform)).sort((a, b) => b.at.localeCompare(a.at));
+}
+function commentHtml(c, withCartoon) {
+  const p = PLAT.find(x => x.k === c.platform);
+  const title = withCartoon ? `<span class="cm-cartoon">No. ${c.n} · ${esc((latest().cartoons[c.n] || {}).title || "")}</span>` : "";
+  const link = c.url && /^https:\/\//.test(c.url) ? `<a href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">reply ↗</a>` : "";
+  return `<div class="cm"><div class="cm-h">${p ? iconHtml(p) : ""}<b>@${esc(c.user)}</b>${title}
+    <span class="muted">${ago(c.at)}${c.likes ? ` · 👍 ${fmt(c.likes)}` : ""}${c.replies ? ` · ${fmt(c.replies)} replies` : ""}</span>${link}</div>
+    <div class="cm-t">${esc(c.text)}</div></div>`;
+}
+function renderComments() {
+  const cs = commentList();
+  $("commentCount").textContent = cs.length ? `${cs.length} comment${cs.length === 1 ? "" : "s"}` : "";
+  $("comments").innerHTML = cs.length ? cs.map(c => commentHtml(c, true)).join("")
+    : `<p class="note">No comments yet on the selected platforms. (X replies aren't collected; Threads needs one more permission.)</p>`;
+}
+
 // ---- leaderboard --------------------------------------------------------------------
 function spark(values) {
   if (values.length < 2) return `<span class="muted">·</span>`;
@@ -347,7 +373,7 @@ function renderBoard() {
   $("board").querySelector("tbody").onclick = e => {
     const tr = e.target.closest("tr[data-n]"); if (!tr) return;
     state.sel = +tr.dataset.n === state.sel ? null : +tr.dataset.n;
-    renderBoard(); renderDetail();
+    renderBoard(); renderDetail(); renderComments();
     if (state.sel) $("detail").scrollIntoView({behavior: "smooth", block: "nearest"});
   };
 }
@@ -373,6 +399,7 @@ function renderDetail() {
   }, true);
   const line = (label, d, extra = "") => d ? `<div class="row"><span>${label}</span><span>${fmt(d.views)} views${extra}
       ${d.url && /^https:\/\//.test(d.url) ? ` · <a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">open ↗</a>` : ""}</span></div>` : "";
+  const cms = commentList(n);
   $("detailStats").innerHTML = `<p class="note">“${esc(c.caption)}”${c.format ? ` · ${c.format} video` : ""}</p>` +
     PLAT.map(p => {
       const d = c[p.k]; if (!d) return "";
@@ -381,7 +408,7 @@ function renderDetail() {
                     d.completion_pct != null ? `${fmt(d.completion_pct, 1)}% watched to the end` : "",
                     d.link_clicks ? `${fmt(d.link_clicks)} link clicks` : ""].filter(Boolean);
       return line(iconHtml(p), d, bits.length ? ` <span class="muted">· ${bits.join(" · ")}</span>` : "");
-    }).join("");
+    }).join("") + (cms.length ? `<h3 class="cm-head">Comments</h3>${cms.map(x => commentHtml(x, false)).join("")}` : "");
 }
 
 // ---- everything ---------------------------------------------------------------------
