@@ -423,5 +423,5 @@ function renderAll() {
   $("updated").textContent = `Updated ${new Date(now.updated).toLocaleString([], {dateStyle: "medium", timeStyle: "short"})}` +
     ` · ${snaps().length} snapshot${snaps().length === 1 ? "" : "s"} since ${new Date(snaps()[0].updated).toLocaleDateString([], {month: "short", day: "numeric"})}` +
     (errs.length ? ` · couldn't refresh: ${errs.join(", ")}` : "");
-  renderTiles(); renderTrend(); renderEngTrend(); renderEngPosts(); renderMix(); renderBoard(); renderDetail();
+  renderTiles(); renderTrend(); renderEngTrend(); renderEngPosts(); renderMix(); renderBoard(); renderDetail(); renderComments();
 }
