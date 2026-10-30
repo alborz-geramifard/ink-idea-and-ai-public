@@ -10,7 +10,7 @@
   --grid: #ece5d6;
   --good: #1f7a3a; --bad: #b3261e;
   /* videos = greens (TikTok, IG Reel), images = yellow (IG image), posts = blues (X, Threads) */
-  --s1: #1b7a3d; --s2: #52b96f; --s3: #d9a400; --s4: #1f5fbf; --s5: #6aa6ea;
+  --s1: #1b7a3d; --s2: #52b96f; --s3: #d9a400; --s4: #1f5fbf; --s5: #6aa6ea; --s6: #2e8a7a;
   --living: #6250d6; --drawing: #8a8984;
   /* engagement kinds: likes red, comments violet, shares orange, saves slate (not used by platforms) */
   --e1: #e34948; --e2: #6250d6; --e3: #eb6834; --e4: #5b6b7d; --e5: #d55181;
@@ -21,7 +21,7 @@
     --surface-0: #121211; --surface-1: #1a1a19; --border: #2c2b28;
     --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8d85;
     --accent: #d9a24a; --grid: #2a2926; --good: #5cc97a; --bad: #ef8a83;
-    --s1: #2f9e55; --s2: #86d69b; --s3: #e8b923; --s4: #3f7fdc; --s5: #97c6f4;
+    --s1: #2f9e55; --s2: #86d69b; --s3: #e8b923; --s4: #3f7fdc; --s5: #97c6f4; --s6: #4fb3a1;
     --living: #9085e9; --drawing: #8f8d85;
     --e1: #e66767; --e2: #9085e9; --e3: #d95926; --e4: #8fa0b3; --e5: #e87ba4;
   }
@@ -31,7 +31,7 @@
   --surface-0: #121211; --surface-1: #1a1a19; --border: #2c2b28;
   --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8d85;
   --accent: #d9a24a; --grid: #2a2926; --good: #5cc97a; --bad: #ef8a83;
-  --s1: #2f9e55; --s2: #86d69b; --s3: #e8b923; --s4: #3f7fdc; --s5: #97c6f4;
+  --s1: #2f9e55; --s2: #86d69b; --s3: #e8b923; --s4: #3f7fdc; --s5: #97c6f4; --s6: #4fb3a1;
   --living: #9085e9; --drawing: #8f8d85;
     --e1: #e66767; --e2: #9085e9; --e3: #d95926; --e4: #8fa0b3; --e5: #e87ba4;
 }
