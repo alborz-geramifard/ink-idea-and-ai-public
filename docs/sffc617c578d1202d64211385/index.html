@@ -7,7 +7,7 @@
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
 <title>Ink Stats</title>
-<link rel="stylesheet" href="dash.css?v=6">
+<link rel="stylesheet" href="dash.css?v=7">
 </head>
 <body>
 <!-- Sign in: the page holds no data; data.json is AES-256-GCM, key = PBKDF2(username + password) -->
@@ -64,6 +64,11 @@
       <div class="scroll"><table id="board" class="board"></table></div>
     </article>
 
+    <article class="card wide">
+      <div class="card-h"><h2>Comments</h2><span class="note" id="commentCount"></span></div>
+      <div id="comments" class="cm-list"></div>
+    </article>
+
     <article class="card wide" id="detail" hidden>
       <div class="card-h"><h2 id="detailTitle"></h2><button class="icon" id="closeDetail" aria-label="Close">✕</button></div>
       <div class="detail-grid">
@@ -78,6 +83,6 @@
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
-<script src="app.js?v=12"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>
