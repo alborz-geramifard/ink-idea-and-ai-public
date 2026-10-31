@@ -303,6 +303,67 @@ const TIME_LABELS = {year: "{yyyy}", month: "{MMM} {d}", day: "{MMM} {d}", hour:
 // over more than two days: dates only (one tick per day at most)
 const dayTicks = r => r.length > 1 && t(r[r.length - 1]) - t(r[0]) > 2 * 864e5 ? {minInterval: 864e5} : {};
 
+// Line charts name each line with a badge sitting on it instead of a legend. items[i] = {text, rich, w, color} for
+// series i. Every visible point is tried above and below its line; the spot farthest from the other lines and the
+// badges already placed wins (its own line must not cross it). Redone on zoom and resize, since pixels move.
+const BADGE_H = 26, BADGE_GAP = 6;
+function lineBadges(ch, items) {
+  const opt = ch.getOption(), rect = ch.getModel().getComponent("grid").coordinateSystem.getRect(), surface = css("--surface-1");
+  const px = opt.series.map((s, i) => s.type !== "line" ? [] :
+    s.data.filter(d => d[1] != null).map(d => ch.convertToPixel({seriesIndex: i}, d)));
+  const yAt = (pts, x) => {   // the polyline's pixel y at pixel x, null outside it
+    for (let j = 1; j < pts.length; j++) {
+      const [a, b] = [pts[j - 1], pts[j]];
+      if (x >= a[0] && x <= b[0]) return b[0] === a[0] ? a[1] : a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]);
+    }
+    return pts.length === 1 && Math.abs(pts[0][0] - x) < 1 ? pts[0][1] : null;
+  };
+  const clear = (pts, box) => {   // vertical clearance between a line and the box over its width (< 0: crosses it)
+    let g = Infinity;
+    for (let x = box[0]; x <= box[2]; x += 4) {
+      const y = yAt(pts, x);
+      if (y != null) g = Math.min(g, y < box[1] ? box[1] - y : y > box[3] ? y - box[3] : -1);
+    }
+    return g;
+  };
+  const boxGap = (a, b) => Math.max(a[0] - b[2], b[0] - a[2], a[1] - b[3], b[1] - a[3]);
+  const placed = opt.series.flatMap(s => ((s.markLine && s.markLine.data) || []).filter(d => d.xAxis != null)
+    .map(d => { const x = ch.convertToPixel({xAxisIndex: 0}, d.xAxis); return [x - 9, rect.y, x + 9, rect.y + 34]; }));   // "No. 7" flags
+  const marks = opt.series.map((s, i) => {
+    const it = items[i];
+    if (!it || !px[i].length) return {data: []};
+    let best = null;
+    const pts = s.data.filter(d => d[1] != null);
+    px[i].forEach(([x, y], j) => {
+      if (x < rect.x || x > rect.x + rect.width) return;   // zoomed out of view
+      for (const dir of [-1, 1]) {
+        const cy = y + dir * (BADGE_H / 2 + BADGE_GAP), box = [x - it.w / 2, cy - BADGE_H / 2, x + it.w / 2, cy + BADGE_H / 2];
+        if (box[0] < rect.x || box[2] > rect.x + rect.width || box[1] < rect.y - 26 || box[3] > rect.y + rect.height) continue;   // the empty top margin is fair game
+        if (clear(px[i], box) < 0) continue;
+        let score = Math.min(60, ...px.map((p, k) => k === i ? Infinity : clear(p, box)), ...placed.map(b => boxGap(box, b)));
+        score += x / rect.width;   // ties go to the newer end
+        if (!best || score > best.score) best = {score, box, coord: pts[j], dir};
+      }
+    });
+    if (!best) return {data: []};
+    placed.push(best.box);
+    return {silent: true, animation: false, symbol: "circle", symbolSize: 1, itemStyle: {color: "transparent"},
+      data: [{coord: best.coord, label: {show: true, position: best.dir < 0 ? "top" : "bottom", distance: BADGE_GAP,
+        formatter: it.text, rich: it.rich, color: css("--text-secondary"), backgroundColor: surface,
+        borderColor: it.color, borderWidth: 1.5, borderRadius: BADGE_H / 2, padding: [3, 7], height: BADGE_H - 8, lineHeight: BADGE_H - 8}}]};
+  });
+  ch.setOption({series: marks.map(markPoint => ({markPoint}))});
+}
+function withBadges(id, items) {   // draw now and again whenever the visible window changes
+  const ch = chart(id), draw = () => lineBadges(ch, items);
+  ch.off("datazoom"); ch.off("finished");
+  ch.on("datazoom", () => setTimeout(draw));
+  let w = ch.getWidth();
+  ch.on("finished", () => { if (ch.getWidth() !== w) { w = ch.getWidth(); draw(); } });   // after a resize
+  draw();
+}
+const platBadge = p => ({text: iconText(p.label), rich: richIcons(16), color: css(p.c), w: 16 + 14 + (p.tag ? p.tag.length * 7 + 4 : 0)});
+
 function renderTrend() {
   const r = inRange(), gain = state.mode === "gain", surface = css("--surface-1");
   document.querySelectorAll("#viewMode button").forEach(b => b.classList.toggle("on", b.dataset.m === state.mode));
@@ -326,7 +387,7 @@ function renderTrend() {
     data: flags.map(([n, at]) => ({name: `No. ${n}`, xAxis: at}))};
   const o = base();
   chart("cTrend").setOption({
-    ...o, series,
+    ...o, series, legend: {...o.legend, show: gain},
     grid: {...o.grid, bottom: 52},
     tooltip: {...o.tooltip, valueFormatter: v => fmt(v)},
     xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
@@ -337,6 +398,7 @@ function renderTrend() {
     graphic: r.length < 2 ? [{type: "text", left: "center", top: "middle",
       style: {text: "The trend fills in as refreshes come in (twice a day).", fill: css("--text-muted"), fontSize: 13}}] : [],
   }, true);
+  if (!gain) withBadges("cTrend", on().map(platBadge));
 }
 
 function renderMix() {
@@ -357,7 +419,7 @@ function renderMix() {
 function renderEngTrend() {
   const r = inRange(), o = base(), surface = css("--surface-1");
   chart("cEngTrend").setOption({
-    ...o, legend: {...o.legend, formatter: n => n},
+    ...o, legend: {show: false},
     tooltip: {...o.tooltip, valueFormatter: v => fmt(v)},
     xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
@@ -366,6 +428,7 @@ function renderEngTrend() {
       data: r.map(s => [s.updated, k === "new_followers" ? allFollowers(s) : engAll(s, k)]),
       lineStyle: {width: 2}, itemStyle: {color: css(c), borderColor: surface, borderWidth: 2}, emphasis: {focus: "series"}})),
   }, true);
+  withBadges("cEngTrend", ENG.map(([k, l, ic, c]) => ({text: ic, color: css(c), w: 34})));
 }
 
 function renderEngPosts() {
@@ -478,18 +541,20 @@ function renderDetail() {
   $("detailTitle").innerHTML = `${thumb(n, "thumb lg")}No. ${n} · ${esc(c.title)}`;
   const r = inRange(), o = base(), surface = css("--surface-1");
   chart("cDetail").resize();
+  const ps = on().filter(p => c[p.k]);
   chart("cDetail").setOption({
-    ...o,
+    ...o, legend: {show: false},
     tooltip: {...o.tooltip, valueFormatter: v => fmt(v)},
     xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
-    series: on().filter(p => c[p.k]).map(p => ({
+    series: ps.map(p => ({
       name: p.label, type: "line", symbol: "circle", symbolSize: 8, showSymbol: r.length < 30, connectNulls: true,
       data: r.map(s => [s.updated, s.cartoons[n] && s.cartoons[n][p.k] ? s.cartoons[n][p.k].views : null]),
       lineStyle: {width: 2}, itemStyle: {color: css(p.c), borderColor: surface, borderWidth: 2}})),
     graphic: r.length < 2 ? [{type: "text", left: "center", top: "middle",
       style: {text: "History builds up with each refresh.", fill: css("--text-muted"), fontSize: 13}}] : [],
   }, true);
+  withBadges("cDetail", ps.map(platBadge));
   const line = (label, d, extra = "") => d ? `<div class="row"><span>${label}</span><span>${fmt(d.views)} views${extra}
       ${d.url && /^https:\/\//.test(d.url) ? ` · <a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">open ↗</a>` : ""}</span></div>` : "";
   const cms = commentList(n);
