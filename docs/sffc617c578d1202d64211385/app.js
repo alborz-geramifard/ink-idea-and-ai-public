@@ -653,15 +653,19 @@ function renderWeb() {
   ];
   $("webTiles").innerHTML = tiles.map(([k, v, d]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join("");
   const o = base(), byDay = days.map(r => r.day);
-  chart("cWeb").setOption({
+  const at = d => d + "T12:00:00Z", surface = css("--surface-1");
+  const line = (name, c, key) => ({name, type: "line", smooth: .25, symbol: "circle", symbolSize: 8, showSymbol: days.length < 30,
+    data: days.map(r => [at(r.day), r[key]]), lineStyle: {width: 2}, itemStyle: {color: css(c), borderColor: surface, borderWidth: 2},
+    emphasis: {focus: "series"}});
+  chart("cWeb").setOption({   // the same look as Views over time: smooth lines named by badges, no legend
     ...o, legend: {show: false},
-    tooltip: {...o.tooltip, axisPointer: {type: "shadow"}, valueFormatter: v => fmt(v)},
-    xAxis: {...o.xAxis, type: "category", data: byDay.map(d => new Date(d + "T12:00:00Z").toLocaleDateString([], {month: "short", day: "numeric"}))},
+    tooltip: {...o.tooltip, valueFormatter: v => fmt(v)},
+    xAxis: {...o.xAxis, type: "time", ...(days.length > 2 ? {minInterval: 864e5} : {}),
+            axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
-    series: [{name: "Page views", type: "bar", barMaxWidth: 26, data: days.map(r => r.views), itemStyle: {color: css("--s4"), borderRadius: [4, 4, 0, 0]}},
-             {name: "Visitors", type: "line", smooth: .25, symbol: "circle", symbolSize: 7, data: days.map(r => r.visitors),
-              lineStyle: {width: 2}, itemStyle: {color: css("--accent")}}],
+    series: [line("Page views", "--s4", "views"), line("Visitors", "--s1", "visitors")],
   }, true);
+  withBadges("cWeb", [{text: "👁 Page views", color: css("--s4"), w: 96}, {text: "👤 Visitors", color: css("--s1"), w: 80}]);
   webTable("webPages", W.path, "Page", pageName);
   webTable("webRefs", W.ref, "Source", k => k ? esc(k) : "Direct / unknown", false);
   webTable("webCountries", W.country, "Country", FLAG, false);
