@@ -7,7 +7,7 @@
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
 <title>Ink Stats</title>
-<link rel="stylesheet" href="dash.css?v=17">
+<link rel="stylesheet" href="dash.css?v=18">
 </head>
 <body>
 <!-- Sign in: the page holds no data; data.json is AES-256-GCM, key = PBKDF2(username + password) -->
@@ -33,7 +33,7 @@
       <div class="seg" id="range" role="radiogroup" aria-label="Time range">
         <button data-r="1">24 h</button><button data-r="7">7 d</button><button data-r="30">30 d</button><button data-r="0" class="on">All</button>
       </div>
-      <div class="chips" id="platformChips" aria-label="Platforms"></div>
+      <a class="icon sitelink" href="../" target="_blank" rel="noopener" title="Open the website">Website ↗</a>
       <button class="icon" id="theme" title="Light / dark" aria-label="Toggle light or dark">◐</button>
       <button class="icon" id="lock" title="Sign out" aria-label="Sign out">⏻</button>
     </div>
@@ -111,6 +111,6 @@
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
-<script src="app.js?v=43"></script>
+<script src="app.js?v=46"></script>
 </body>
 </html>
