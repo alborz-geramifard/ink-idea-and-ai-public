@@ -9,5 +9,7 @@ h2 { font-size: 20px; margin-top: 32px; }
 a { color: var(--gold); }
 .tag { color: var(--muted); margin: 4px 0 0; }
 ul.links { list-style: none; padding: 0; }
-ul.links li { margin: 6px 0; }
+ul.links li { margin: 8px 0; }
+ul.links a { display: inline-flex; align-items: center; gap: 10px; }
+ul.links svg.icon { width: 22px; height: 22px; flex: none; }
 footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #ddd3c2; color: var(--muted); font-size: 14px; }
