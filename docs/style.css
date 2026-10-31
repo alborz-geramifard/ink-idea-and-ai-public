@@ -85,9 +85,9 @@ a.play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50
          font: 22px/1 var(--sans); color: #fff; background: rgba(20, 18, 15, .55); border: 2px solid rgba(255, 255, 255, .85);
          backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); box-shadow: 0 6px 24px rgba(0, 0, 0, .3);
          transition: transform .15s ease, background .15s ease; }
-a.play:hover { transform: translate(-50%, -50%) scale(1.08); background: rgba(200, 137, 43, .85); }
+a.play:hover { transform: translate(-50%, -50%) scale(1.08); background: #db8c1d; border-color: #fff; }   /* the logo's orange */
 ul.thumbs li { position: relative; }
-ul.thumbs a.play.small { color: #fff; font: 14px/1 var(--sans); }
+ul.thumbs a.play.small { display: flex; color: #fff; font: 14px/1 var(--sans); }   /* the thumbnail link styles must not leak in */
 a.play.small { width: 36px; height: 36px; font-size: 14px; padding-left: 3px; border-width: 1.5px; top: 46%; }
 a.hero:hover { transform: translateY(-3px); }
 .no { display: inline-block; font: 700 12px/1 var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
