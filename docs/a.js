@@ -1,6 +1,6 @@
 // Visit counter: page, referrer and the time the page was visible. No cookies, nothing stored on this device.
 (() => {
-  const URL_ = "ANALYTICS_URL/hit";
+  const URL_ = "https://ink-analytics.inkideaandai.workers.dev/hit";
   if (!/alborz-geramifard\.com$/.test(location.hostname)) return;   // never count local previews
   if (URL_.startsWith("ANALYTICS_URL")) return;   // not set up yet (analytics.py setup fills it in)
   const id = (crypto.randomUUID && crypto.randomUUID()) || String(Math.random()).slice(2) + Date.now();
