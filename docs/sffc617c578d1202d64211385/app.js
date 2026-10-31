@@ -5,11 +5,11 @@
 
 const PLAT = [
   {k: "tiktok", label: "TikTok", c: "--s1", brand: "tiktok", tag: ""},
-  {k: "instagram_reel", label: "IG Reel", c: "--s2", brand: "instagram", tag: "Reel"},
-  {k: "instagram_image", label: "IG image", c: "--s3", brand: "instagram", tag: "image"},
-  {k: "x", label: "X", c: "--s4", brand: "x", tag: ""},
-  {k: "threads", label: "Threads", c: "--s5", brand: "threads", tag: ""},
+  {k: "instagram_reel", label: "Instagram", c: "--s2", brand: "instagram", tag: ""},   // the Reel: shown as plain Instagram
   {k: "youtube", label: "YouTube", c: "--s6", brand: "youtube", tag: ""},
+  {k: "instagram_image", label: "IG image", c: "--s3", brand: "instagram", tag: "image"},
+  {k: "threads", label: "Threads", c: "--s5", brand: "threads", tag: ""},
+  {k: "x", label: "X", c: "--s4", brand: "x", tag: ""},
 ];
 
 // Platform logos (monochrome, drawn in the text colour so they work in light and dark)
@@ -20,8 +20,24 @@ const GLYPH = {
   youtube: '<path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8zM9.6 15.6V8.4l6.3 3.6z"/>',
   threads: '<path fill="none" stroke="F" stroke-width="2.2" stroke-linecap="round" d="M16.2 11.2c-.5-2.6-2.3-3.7-4.3-3.7-2.3 0-3.7 1.3-3.9 3 M16.3 12.4c0 3-1.6 4.3-3.9 4.3-1.9 0-3.1-1-3.1-2.4 0-1.7 1.6-2.6 3.8-2.6 3.7 0 6.4 1.4 6.4 4.4 0 3.3-3 5.6-7 5.6-5.3 0-8.3-3.6-8.3-9 0-5.5 3.2-9 8.4-9 4.2 0 6.9 2 7.9 5.6"/>',
 };
-const logo = brand => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${css("--text-primary")}">${GLYPH[brand].replace(/"F"/g, `"${css("--text-primary")}"`)}</svg>`);
+// Brand colours where the brand has them (TikTok, Instagram, YouTube); X and Threads are black-only marks, so
+// they stay in the text colour and follow the theme.
+const COLOR_GLYPH = {
+  tiktok: fg => `<g transform="translate(-.8 -.6)" fill="#25F4EE">${GLYPH.tiktok}</g>` +
+    `<g transform="translate(.8 .6)" fill="#FE2C55">${GLYPH.tiktok}</g><g fill="${fg}">${GLYPH.tiktok}</g>`,
+  instagram: () => '<defs><radialGradient id="ig" cx="30%" cy="107%" r="150%"><stop offset="0" stop-color="#fdf497"/>' +
+    '<stop offset=".05" stop-color="#fdf497"/><stop offset=".45" stop-color="#fd5949"/><stop offset=".6" stop-color="#d6249f"/>' +
+    '<stop offset=".9" stop-color="#285aeb"/></radialGradient></defs><rect x="1" y="1" width="22" height="22" rx="6.5" fill="url(#ig)"/>' +
+    '<rect x="5.6" y="5.6" width="12.8" height="12.8" rx="4" fill="none" stroke="#fff" stroke-width="1.9"/>' +
+    '<circle cx="12" cy="12" r="3.1" fill="none" stroke="#fff" stroke-width="1.9"/><circle cx="16.4" cy="7.6" r="1.1" fill="#fff"/>',
+  youtube: () => '<rect x="0" y="3.6" width="24" height="16.8" rx="4.6" fill="#ff0000"/><path fill="#fff" d="M9.6 15.6V8.4l6.3 3.6z"/>',
+};
+const logo = brand => {
+  const fg = css("--text-primary");
+  const body = COLOR_GLYPH[brand] ? COLOR_GLYPH[brand](fg) : GLYPH[brand].replace(/"F"/g, `"${fg}"`);
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${fg}">${body}</svg>`);
+};
 const byLabel = label => PLAT.find(p => p.label === label) || FOLLOW_P.find(p => p.label === label);
 function richIcons(size = 16) {   // ECharts rich-text styles: {i_tiktok|} draws the TikTok logo
   const r = {tag: {color: css("--text-secondary"), fontSize: 12, padding: [0, 0, 0, 4]}};
@@ -163,9 +179,8 @@ const latest = () => snaps()[snaps().length - 1];
 const on = () => PLAT.filter(p => !state.off.has(p.k));
 const views = (c, k) => (c && c[k] && c[k].views) || 0;
 const inter = d => d ? (d.likes || 0) + (d.comments || 0) + (d.shares || 0) + (d.saves || 0) : 0;
-const onGraph = () => on().filter(p => p.k !== "instagram_reel");   // graphs chart Instagram by its image post only
-const eng = (c, k, ps = on()) => ps.reduce((a, p) => a + ((c && c[p.k] && c[p.k][k]) || 0), 0);   // one kind, enabled platforms
-const engAll = (s, k, ps) => Object.values(s.cartoons).reduce((a, c) => a + eng(c, k, ps), 0);
+const eng = (c, k) => on().reduce((a, p) => a + ((c && c[p.k] && c[p.k][k]) || 0), 0);   // one kind, enabled platforms
+const engAll = (s, k) => Object.values(s.cartoons).reduce((a, c) => a + eng(c, k), 0);
 
 function inRange() {
   const all = snaps();
@@ -228,7 +243,7 @@ document.addEventListener("mousemove", e => {
   preview.style.left = x + "px"; preview.style.top = y + "px";
 });
 
-function reelWatch(s) {   // median Reel watch time; > 60 s is a looping outlier, not real watching
+function reelWatch(s) {   // median Instagram (Reel) watch time; > 60 s is a looping outlier, not real watching
   const w = Object.values(s.cartoons).map(c => c.instagram_reel && c.instagram_reel.avg_watch_s)
     .filter(v => v > 0 && v < 60).sort((a, b) => a - b);
   return w.length ? w[Math.floor(w.length / 2)] : null;
@@ -275,8 +290,8 @@ function renderTiles() {
     ["Views", fmt(allViews(now)), delta(allViews(now), then && allViews(then)) + ` ${when}`],
     ["Interactions", fmt(allInter(now)), delta(allInter(now), then && allInter(then)) + ` · likes, comments, shares, saves`],
     ["Followers", fmt(allFollowers(now)), delta(allFollowers(now), then && allFollowers(then)) + " · all platforms"],
-    ["Reel watch time", reelWatch(now) == null ? "–" : fmt(reelWatch(now), 1) + " s",
-     delta(reelWatch(now), then && reelWatch(then), 1) + " · median per Reel"],
+    ["Instagram watch time", reelWatch(now) == null ? "–" : fmt(reelWatch(now), 1) + " s",
+     delta(reelWatch(now), then && reelWatch(then), 1) + " · median per video"],
     ["Top cartoon", best ? `No. ${esc(best[0])}` : "–", best ? `${esc(best[1].title)} · ${fmt(cartoonViews(best[1]))} views` : ""],
   ];
   $("tiles").innerHTML = tiles.map(([k, v, d]) =>
@@ -340,9 +355,10 @@ function lineBadges(ch, items) {
       for (const dir of [-1, 1]) {
         const cy = y + dir * (BADGE_H / 2 + BADGE_GAP), box = [x - it.w / 2, cy - BADGE_H / 2, x + it.w / 2, cy + BADGE_H / 2];
         if (box[0] < rect.x || box[2] > rect.x + rect.width || box[1] < rect.y - 26 || box[3] > rect.y + rect.height) continue;   // the empty top margin is fair game
-        if (clear(px[i], box) < 0) continue;
-        let score = Math.min(60, ...px.map((p, k) => k === i ? Infinity : clear(p, box)), ...placed.map(b => boxGap(box, b)));
-        score += x / rect.width;   // ties go to the newer end
+        const near = Math.min(Infinity, ...placed.map(b => boxGap(box, b)));
+        let score = Math.min(60, near, ...px.map((p, k) => k === i ? Infinity : clear(p, box))) + x / rect.width;   // ties: newer end
+        if (clear(px[i], box) < 0) score -= 1000;   // its own line crossing it: only when nothing else fits
+        if (near < 0) score -= 2000;                // covering another badge: worse still
         if (!best || score > best.score) best = {score, box, coord: pts[j], dir};
       }
     });
@@ -368,7 +384,7 @@ const platBadge = p => ({text: iconText(p.label), rich: richIcons(16), color: cs
 function renderTrend() {
   const r = inRange(), gain = state.mode === "gain", surface = css("--surface-1");
   document.querySelectorAll("#viewMode button").forEach(b => b.classList.toggle("on", b.dataset.m === state.mode));
-  const series = onGraph().map(p => {
+  const series = on().map(p => {
     const pts = r.map(s => [s.updated, totals(s)[p.k]]);
     const data = gain ? pts.slice(1).map((pt, i) => [pt[0], pt[1] - pts[i][1]]) : pts;
     return gain
@@ -393,17 +409,17 @@ function renderTrend() {
     tooltip: {...o.tooltip, valueFormatter: v => fmt(v)},
     xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
-    dataZoom: [{type: "inside"}, {type: "slider", height: 20, bottom: 6, borderColor: "transparent",
+    dataZoom: [{type: "inside", filterMode: "none"}, {type: "slider", filterMode: "none", height: 20, bottom: 6, borderColor: "transparent",
                fillerColor: "rgba(200,137,43,.15)", dataBackground: {lineStyle: {color: css("--text-muted")}, areaStyle: {opacity: 0}},
                handleStyle: {color: css("--accent")}, textStyle: {color: css("--text-muted")}}],
     graphic: r.length < 2 ? [{type: "text", left: "center", top: "middle",
       style: {text: "The trend fills in as refreshes come in (twice a day).", fill: css("--text-muted"), fontSize: 13}}] : [],
   }, true);
-  if (!gain) withBadges("cTrend", onGraph().map(platBadge));
+  if (!gain) withBadges("cTrend", on().map(platBadge));
 }
 
 function renderMix() {
-  const tt = totals(latest()), ps = onGraph().slice().sort((a, b) => tt[a.k] - tt[b.k]), all = ps.reduce((a, p) => a + tt[p.k], 0) || 1;
+  const tt = totals(latest()), ps = on().slice().sort((a, b) => tt[a.k] - tt[b.k]), all = ps.reduce((a, p) => a + tt[p.k], 0) || 1;
   const o = base();
   chart("cMix").setOption({
     ...o, legend: {show: false}, grid: {...o.grid, top: 8, right: 70},
@@ -426,17 +442,17 @@ function renderEngTrend() {
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
     series: ENG.map(([k, l, ic, c]) => ({
       name: k === "new_followers" ? `${ic} Followers (all platforms)` : `${ic} ${l}`, type: "line", step: "end", symbol: "circle", symbolSize: 8, showSymbol: r.length < 30,
-      data: r.map(s => [s.updated, k === "new_followers" ? allFollowers(s) : engAll(s, k, onGraph())]),
+      data: r.map(s => [s.updated, k === "new_followers" ? allFollowers(s) : engAll(s, k)]),
       lineStyle: {width: 2}, itemStyle: {color: css(c), borderColor: surface, borderWidth: 2}, emphasis: {focus: "series"}})),
   }, true);
   withBadges("cEngTrend", ENG.map(([k, l, ic, c]) => ({text: ic, color: css(c), w: 34})));
 }
 
 function renderEngPosts() {
-  const total = c => ENG.reduce((a, [k]) => a + eng(c, k, onGraph()), 0);
+  const total = c => ENG.reduce((a, [k]) => a + eng(c, k), 0);
   const cs = Object.entries(latest().cartoons).sort((a, b) => total(b[1]) - total(a[1]) || +a[0] - +b[0]),   // most engaged first
         o = base(), surface = css("--surface-1");
-  const any = cs.some(([, c]) => ENG.some(([k]) => eng(c, k, onGraph())));
+  const any = cs.some(([, c]) => ENG.some(([k]) => eng(c, k)));
   chart("cEngPosts").setOption({
     ...o, legend: {...o.legend, formatter: n => n},
     tooltip: {...o.tooltip, axisPointer: {type: "shadow"},
@@ -445,7 +461,7 @@ function renderEngPosts() {
             axisLabel: {...o.xAxis.axisLabel, interval: 0, fontSize: 11, lineHeight: 14}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
     series: ENG.map(([k, l, ic, c], i) => ({
-      name: `${ic} ${l}`, type: "bar", stack: "eng", barMaxWidth: 34, data: cs.map(([, cc]) => eng(cc, k, onGraph())),
+      name: `${ic} ${l}`, type: "bar", stack: "eng", barMaxWidth: 34, data: cs.map(([, cc]) => eng(cc, k)),
       itemStyle: {color: css(c), borderColor: surface, borderWidth: 1,
                   borderRadius: i === ENG.length - 1 ? [4, 4, 0, 0] : 0}, emphasis: {focus: "series"}})),
     graphic: any ? [] : [{type: "text", left: "center", top: "middle",
@@ -509,7 +525,7 @@ function renderBoard() {
                 ["rate", `<span title="Engagement rate: interactions per 100 views">Eng %</span>`],
                 ["tw", `<span title="TikTok average watch time">⏱ ${iconHtml(PLAT[0])}</span>`],
                 ["tc", `<span title="TikTok: watched to the end">✓ ${iconHtml(PLAT[0])}</span>`],
-                ["rw", `<span title="Instagram Reel average watch time">⏱ ${iconHtml(PLAT[1])}</span>`],
+                ["rw", `<span title="Instagram average watch time">⏱ ${iconHtml(PLAT[1])}</span>`],
                 ["change", "Change"], [null, "Trend"]];
   $("board").innerHTML = `<thead><tr>${cols.map(([k, l]) =>
       `<th ${k ? `data-k="${k}"` : ""} class="${k === key ? "sorted" + (asc ? " asc" : "") : ""}">${l}</th>`).join("")}</tr></thead><tbody>` +
@@ -542,7 +558,7 @@ function renderDetail() {
   $("detailTitle").innerHTML = `${thumb(n, "thumb lg")}No. ${n} · ${esc(c.title)}`;
   const r = inRange(), o = base(), surface = css("--surface-1");
   chart("cDetail").resize();
-  const ps = onGraph().filter(p => c[p.k]);
+  const ps = on().filter(p => c[p.k]);
   chart("cDetail").setOption({
     ...o, legend: {show: false},
     tooltip: {...o.tooltip, valueFormatter: v => fmt(v)},
