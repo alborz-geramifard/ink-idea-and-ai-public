@@ -45,6 +45,10 @@ function richIcons(size = 16) {   // ECharts rich-text styles: {i_tiktok|} draws
   return r;
 }
 const iconText = label => { const p = byLabel(label); return p ? `{i_${p.brand}|}` + (p.tag ? `{tag|${p.tag}}` : "") : label; };
+// cartoon numbers: white digits on a blue circle (HTML and ECharts rich text)
+const num = (n, cls = "") => `<span class="num${cls ? " " + cls : ""}">${esc(n)}</span>`;
+const numRich = (size = 18) => ({backgroundColor: css("--num"), color: "#fff", borderRadius: size / 2, width: size, height: size,
+                                 lineHeight: size, align: "center", fontSize: Math.round(size * .6), fontWeight: "bold"});
 const iconHtml = p => `<img src="${logo(p.brand)}" alt="${esc(p.label)}" title="${esc(p.label)}" class="pl">` +
   (p.tag ? `<span class="pltag">${p.tag}</span>` : "");
 const FOLLOW = [["tiktok", "TikTok", "--s1"], ["instagram", "Instagram", "--s2"], ["x", "X", "--s4"], ["threads", "Threads", "--s5"]];
@@ -263,16 +267,16 @@ function renderChanges() {
   }
   moves.sort((a, b) => b[0] - a[0]);
   if (dv) lines.push(`👀 <b>${dv > 0 ? "+" : ""}${fmt(dv)} views</b>` +
-    (moves.length ? ` · top: ${moves.slice(0, 3).map(([d, n, p]) => `#${n} ${iconHtml(p)} <b>+${fmt(d)}</b>`).join(" · ")}` : ""));
+    (moves.length ? ` · top: ${moves.slice(0, 3).map(([d, n, p]) => `${num(n)} ${iconHtml(p)} <b>+${fmt(d)}</b>`).join(" · ")}` : ""));
   const eng = ENG.filter(([k]) => k !== "new_followers").map(([k, l, ic]) => [ic, engAll(now, k) - engAll(base, k)]).filter(([, d]) => d);
   if (eng.length) lines.push(`💬 Engagement: ${eng.map(([ic, d]) => `${ic} <b>${d > 0 ? "+" : ""}${d}</b>`).join(" · ")}`);
   const df = allFollowers(now) - allFollowers(base);
   if (df) lines.push(`👤 Followers <b>${fmt(allFollowers(base))} → ${fmt(allFollowers(now))}</b>`);
   const fresh = commentList().filter(c => new Date(c.at).getTime() >= t(base));
   if (fresh.length) lines.push(`🗨️ <b>${fresh.length} new comment${fresh.length > 1 ? "s" : ""}</b>: ` +
-    fresh.slice(0, 2).map(c => `@${esc(c.user)} on #${c.n}: “${esc(c.text.slice(0, 60))}”`).join(" · "));
+    fresh.slice(0, 2).map(c => `@${esc(c.user)} on ${num(c.n)} “${esc(c.text.slice(0, 60))}”`).join(" · "));
   const posted = Object.entries(now.cartoons).filter(([, c]) => postedAt(c) && new Date(postedAt(c)).getTime() >= t(base));
-  if (posted.length) lines.push(`🆕 Posted: ${posted.map(([n, c]) => `#${n} · ${esc(c.title)}`).join(", ")}`);
+  if (posted.length) lines.push(`🆕 Posted: ${posted.map(([n, c]) => `${num(n)} ${esc(c.title)}`).join(", ")}`);
   $("changes").innerHTML = lines.length ? lines.map(l => `<div class="chg">${l}</div>`).join("") : `<p class="note">Quiet: nothing changed in the last 24 hours.</p>`;
 }
 
@@ -292,7 +296,7 @@ function renderTiles() {
     ["Followers", fmt(allFollowers(now)), delta(allFollowers(now), then && allFollowers(then)) + " · all platforms"],
     ["Instagram watch time", reelWatch(now) == null ? "–" : fmt(reelWatch(now), 1) + " s",
      delta(reelWatch(now), then && reelWatch(then), 1) + " · median per video"],
-    ["Top cartoon", best ? `#${esc(best[0])}` : "–", best ? `${esc(best[1].title)} · ${fmt(cartoonViews(best[1]))} views` : ""],
+    ["Top cartoon", best ? num(best[0], "lg") : "–", best ? `${esc(best[1].title)} · ${fmt(cartoonViews(best[1]))} views` : ""],
   ];
   $("tiles").innerHTML = tiles.map(([k, v, d]) =>
     `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join("");
@@ -344,7 +348,7 @@ function lineBadges(ch, items) {
   };
   const boxGap = (a, b) => Math.max(a[0] - b[2], b[0] - a[2], a[1] - b[3], b[1] - a[3]);
   const placed = opt.series.flatMap(s => ((s.markLine && s.markLine.data) || []).filter(d => d.xAxis != null)
-    .map(d => { const x = ch.convertToPixel({xAxisIndex: 0}, d.xAxis); return [x - 9, rect.y, x + 9, rect.y + 34]; }));   // "#7" flags
+    .map(d => { const x = ch.convertToPixel({xAxisIndex: 0}, d.xAxis); return [x - 12, rect.y - 26, x + 12, rect.y]; }));   // the flags' number circles
   const marks = opt.series.map((s, i) => {
     const it = items[i];
     if (!it || !px[i].length) return {data: []};
@@ -400,8 +404,8 @@ function renderTrend() {
   if (series.length && flags.length) series[0].markLine = {
     symbol: "none", silent: true, animation: false,
     lineStyle: {color: css("--text-muted"), type: "dashed", width: 1},
-    label: {formatter: d => d.name, position: "insideEndTop", color: css("--text-secondary"), fontSize: 11},
-    data: flags.map(([n, at]) => ({name: `#${n}`, xAxis: at}))};
+    label: {formatter: d => `{num|${d.name}}`, position: "end", distance: 4, rich: {num: numRich(18)}},   // upright, above the plot
+    data: flags.map(([n, at]) => ({name: n, xAxis: at}))};
   const o = base();
   chart("cTrend").setOption({
     ...o, series, legend: {...o.legend, show: gain},
@@ -457,8 +461,8 @@ function renderEngPosts() {
     ...o, legend: {...o.legend, formatter: n => n},
     tooltip: {...o.tooltip, axisPointer: {type: "shadow"},
               formatter: ps => `<b>${ps[0].axisValueLabel}</b><br>` + ps.map(x => `${x.marker}${x.seriesName}: <b>${fmt(x.value)}</b>`).join("<br>")},
-    xAxis: {...o.xAxis, type: "category", data: cs.map(([n, c]) => `#${n}\n${c.title}`),
-            axisLabel: {...o.xAxis.axisLabel, interval: 0, fontSize: 11, lineHeight: 14}},
+    xAxis: {...o.xAxis, type: "category", data: cs.map(([n, c]) => `{num|${n}}\n${c.title}`),
+            axisLabel: {...o.xAxis.axisLabel, interval: 0, fontSize: 11, lineHeight: 16, rich: {num: numRich(16)}}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
     series: ENG.map(([k, l, ic, c], i) => ({
       name: `${ic} ${l}`, type: "bar", stack: "eng", barMaxWidth: 34, data: cs.map(([, cc]) => eng(cc, k)),
@@ -484,7 +488,7 @@ function commentHtml(c, withCartoon, reply) {
   const p = PLAT.find(x => x.k === c.platform);
   const thread = (c.thread || []).map(r => commentHtml({...r, n: c.n}, false, true)).join("");
   const needs = !reply && !c.ours && !(c.thread || []).some(r => r.ours);
-  const title = withCartoon ? `<span class="cm-cartoon">#${c.n} · ${esc((latest().cartoons[c.n] || {}).title || "")}</span>` : "";
+  const title = withCartoon ? `<span class="cm-cartoon">${num(c.n)} ${esc((latest().cartoons[c.n] || {}).title || "")}</span>` : "";
   const link = c.url && /^https:\/\//.test(c.url) ? `<a href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">reply ↗</a>` : "";
   return `<div class="cm${reply ? " cm-reply" : ""}${c.ours ? " cm-ours" : ""}"><div class="cm-h">${p ? iconHtml(p) : ""}<b>@${esc(c.user)}</b>${c.ours ? `<span class="badge">you</span>` : ""}${needs ? `<span class="badge cm-needs">needs a reply</span>` : ""}${title}
     <span class="muted">${ago(c.at)}${c.likes ? ` · 👍 ${fmt(c.likes)}` : ""}</span>${link}</div>
@@ -530,7 +534,7 @@ function renderBoard() {
   $("board").innerHTML = `<thead><tr>${cols.map(([k, l]) =>
       `<th ${k ? `data-k="${k}"` : ""} class="${k === key ? "sorted" + (asc ? " asc" : "") : ""}">${l}</th>`).join("")}</tr></thead><tbody>` +
     rows.map(row => `<tr data-n="${row.n}" class="${row.n === state.sel ? "sel" : ""}">
-      <td><div class="cell-cartoon">${thumb(row.n)}<span>#${row.n} · ${esc(row.c.title)}${row.c.format ? `<span class="badge ${row.c.format}">${row.c.format}</span>` : ""}</span></div></td>
+      <td><div class="cell-cartoon">${thumb(row.n)}<span>${num(row.n)} ${esc(row.c.title)}${row.c.format ? `<span class="badge ${row.c.format}">${row.c.format}</span>` : ""}</span></div></td>
       ${ps.map(p => `<td>${fmt(row[p.k])}</td>`).join("")}
       <td><b>${fmt(row.total)}</b></td>${ENG.map(([k]) => `<td class="${row[k] ? "" : "muted"}">${fmt(row[k])}</td>`).join("")}
       <td>${row.rate == null ? "–" : fmt(row.rate, 1) + "%"}</td><td>${row.tw == null ? "–" : fmt(row.tw, 1) + " s"}</td>
@@ -555,7 +559,7 @@ function renderDetail() {
   const n = state.sel, c = n && latest().cartoons[n];
   $("detail").hidden = !c;
   if (!c) return;
-  $("detailTitle").innerHTML = `${thumb(n, "thumb lg")}#${n} · ${esc(c.title)}`;
+  $("detailTitle").innerHTML = `${thumb(n, "thumb lg")}${num(n)} ${esc(c.title)}`;
   const r = inRange(), o = base(), surface = css("--surface-1");
   chart("cDetail").resize();
   const ps = on().filter(p => c[p.k]);
