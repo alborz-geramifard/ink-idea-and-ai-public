@@ -170,12 +170,6 @@ setInterval(() => { if (DATA && !saved()) lock(); }, 60 * 1000);   // the day is
 function start() {
   $("login").hidden = true;
   $("app").hidden = false;
-  $("platformChips").onclick = e => {
-    const b = e.target.closest(".chip"); if (!b) return;
-    state.off.has(b.dataset.k) ? state.off.delete(b.dataset.k) : state.off.add(b.dataset.k);
-    if (state.off.size === PLAT.length) state.off.delete(b.dataset.k);   // keep at least one
-    renderAll();
-  };
   $("range").onclick = e => { const b = e.target.closest("button"); if (!b) return; state.range = +b.dataset.r; renderAll(); };
   $("viewMode").onclick = e => { const b = e.target.closest("button"); if (!b) return; state.mode = b.dataset.m; renderAll(); };
   $("closeDetail").onclick = () => { state.sel = null; renderAll(); };
@@ -599,19 +593,14 @@ function renderDetail() {
 
 // ---- everything ---------------------------------------------------------------------
 function renderAll() {
-  $("platformChips").innerHTML = PLAT.map(p =>   // rebuilt each time so the logos follow the theme
-    `<button class="chip" data-k="${p.k}" aria-pressed="true" aria-label="${p.label}"><i style="background:var(${p.c})"></i>${iconHtml(p)}</button>`).join("");
   document.querySelectorAll("#range button").forEach(b => b.classList.toggle("on", +b.dataset.r === state.range));
-  document.querySelectorAll("#platformChips .chip").forEach(b => {
-    b.classList.toggle("off", state.off.has(b.dataset.k)); b.setAttribute("aria-pressed", !state.off.has(b.dataset.k));
-  });
   const now = latest(), errs = Object.keys(now.errors || {});
   $("updated").textContent = `Updated ${new Date(now.updated).toLocaleString([], {dateStyle: "medium", timeStyle: "short"})}` +
     ` · ${snaps().length} snapshot${snaps().length === 1 ? "" : "s"} since ${new Date(snaps()[0].updated).toLocaleDateString([], {month: "short", day: "numeric"})}` +
     (errs.length ? ` · couldn't refresh: ${errs.join(", ")}` : "");
   const web = state.tab === "web";
   document.querySelectorAll("#tab button").forEach(b => b.classList.toggle("on", b.dataset.t === state.tab));
-  $("socialView").hidden = web; $("webView").hidden = !web; $("platformChips").hidden = web;
+  $("socialView").hidden = web; $("webView").hidden = !web;
   if (web) { renderWeb(); return; }
   renderChanges(); renderTiles(); renderTrend(); renderEngTrend(); renderEngPosts(); renderMix(); renderBoard(); renderDetail(); renderComments();
   preloadBig();
@@ -645,7 +634,7 @@ function webTable(id, rows, label, name, share = true) {
   const list = Object.entries(webSum(webCut(rows))).sort((a, b) => b[1].views - a[1].views);
   const total = list.reduce((a, [, o]) => a + o.views, 0) || 1;
   $(id).innerHTML = `<thead><tr><th>${label}</th><th>Views</th>${share ? "<th>Share</th>" : ""}<th>Visitors</th><th>Avg time</th></tr></thead><tbody>` +
-    (list.length ? list.map(([k, o]) => `<tr><td>${name(k)}</td><td>${fmt(o.views)}</td>${share ? `<td>${fmt(o.views / total * 100)}%</td>` : ""}` +
+    (list.length ? list.map(([k, o]) => `<tr><td>${id === "webPages" && k ? `<a href="${esc(k)}" target="_blank" rel="noopener">${name(k)}</a>` : name(k)}</td><td>${fmt(o.views)}</td>${share ? `<td>${fmt(o.views / total * 100)}%</td>` : ""}` +
       `<td>${fmt(o.visitors)}</td><td>${secs(avgTime(o))}</td></tr>`).join("") : `<tr><td colspan="${share ? 5 : 4}" class="muted">No visits in this range.</td></tr>`) +
     "</tbody>";
 }
