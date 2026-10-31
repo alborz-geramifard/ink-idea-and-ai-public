@@ -7,7 +7,7 @@
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
 <title>Ink Stats</title>
-<link rel="stylesheet" href="dash.css?v=16">
+<link rel="stylesheet" href="dash.css?v=17">
 </head>
 <body>
 <!-- Sign in: the page holds no data; data.json is AES-256-GCM, key = PBKDF2(username + password) -->
@@ -27,6 +27,9 @@
   <header class="top">
     <div class="brand"><img src="logo.png" alt="" class="logo sm"><div><h1>Ink Stats</h1><p class="muted" id="updated"></p></div></div>
     <div class="controls" role="toolbar" aria-label="Filters">
+      <div class="seg" id="tab" role="tablist" aria-label="View">
+        <button data-t="social" class="on" role="tab">Social</button><button data-t="web" role="tab">Website</button>
+      </div>
       <div class="seg" id="range" role="radiogroup" aria-label="Time range">
         <button data-r="1">24 h</button><button data-r="7">7 d</button><button data-r="30">30 d</button><button data-r="0" class="on">All</button>
       </div>
@@ -36,6 +39,7 @@
     </div>
   </header>
 
+  <div id="socialView">
   <section class="card changes-card" aria-label="What changed">
     <div class="card-h"><h2>What changed</h2><span class="note">last 24 hours</span></div>
     <div id="changes"></div>
@@ -83,11 +87,30 @@
     </article>
 
   </section>
+  </div>
+
+  <div id="webView" hidden>
+    <section class="tiles" id="webTiles" aria-label="Website headline numbers"></section>
+    <section class="grid">
+      <article class="card wide">
+        <div class="card-h"><h2>Visits per day</h2><span class="note">page views (bars) and visitors (line); a visitor counts once a day</span></div>
+        <div class="chart short" id="cWeb"></div>
+      </article>
+      <article class="card wide">
+        <div class="card-h"><h2>Pages</h2><span class="note">which cartoons people open</span></div>
+        <div class="scroll"><table class="board web" id="webPages"></table></div>
+      </article>
+      <article class="card"><div class="card-h"><h2>Where visitors come from</h2></div><div class="scroll"><table class="board web" id="webRefs"></table></div></article>
+      <article class="card"><div class="card-h"><h2>Countries</h2></div><div class="scroll"><table class="board web" id="webCountries"></table></div></article>
+      <article class="card"><div class="card-h"><h2>Devices</h2></div><div class="scroll"><table class="board web" id="webDevices"></table></div></article>
+    </section>
+    <p class="muted empty" id="webEmpty" hidden>No website visits recorded yet. The counter starts once it is set up and the site is published.</p>
+  </div>
 
   <footer class="muted">Refreshed every 30 minutes (X every 3 h, Threads daily) · data encrypted end to end · stays signed in for 1 day on this browser</footer>
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
-<script src="app.js?v=42"></script>
+<script src="app.js?v=43"></script>
 </body>
 </html>
