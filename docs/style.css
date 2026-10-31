@@ -13,3 +13,6 @@ ul.links li { margin: 8px 0; }
 ul.links a { display: inline-flex; align-items: center; gap: 10px; }
 ul.links svg.icon { width: 22px; height: 22px; flex: none; }
 footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #ddd3c2; color: var(--muted); font-size: 14px; }
+header.banner { display: block; margin: 0 0 32px; }
+header.banner img { display: block; width: 100%; height: auto; border-radius: 12px; border: 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
