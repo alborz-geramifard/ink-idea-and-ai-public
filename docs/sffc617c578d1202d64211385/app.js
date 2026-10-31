@@ -466,7 +466,7 @@ function renderEngPosts() {
   chart("cEngPosts").setOption({
     ...o, legend: {...o.legend, formatter: n => n},
     tooltip: {...o.tooltip, axisPointer: {type: "shadow"},
-              formatter: ps => `<b>${ps[0].axisValueLabel}</b><br>` + ps.map(x => `${x.marker}${x.seriesName}: <b>${fmt(x.value)}</b>`).join("<br>")},
+              formatter: ps => `<b>${ps[0].axisValueLabel.replace(/^\{num\|(\d+)\}\n(.*)$/s, (m, n, title) => `${num(n)} ${esc(title)}`)}</b><br>` + ps.map(x => `${x.marker}${x.seriesName}: <b>${fmt(x.value)}</b>`).join("<br>")},
     xAxis: {...o.xAxis, type: "category", data: cs.map(([n, c]) => `{num|${n}}\n${c.title}`),
             axisLabel: {...o.xAxis.axisLabel, interval: 0, fontSize: 11, lineHeight: 16, rich: {num: numRich(16)}}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
