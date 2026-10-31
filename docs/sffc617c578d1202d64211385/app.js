@@ -350,7 +350,7 @@ function lineBadges(ch, items) {
     return {silent: true, animation: false, symbol: "circle", symbolSize: 1, itemStyle: {color: "transparent"},
       data: [{coord: best.coord, label: {show: true, position: best.dir < 0 ? "top" : "bottom", distance: BADGE_GAP,
         formatter: it.text, rich: it.rich, color: css("--text-secondary"), backgroundColor: surface,
-        borderColor: it.color, borderWidth: 1.5, borderRadius: BADGE_H / 2, padding: [3, 7], height: BADGE_H - 8, lineHeight: BADGE_H - 8}}]};
+        borderRadius: BADGE_H / 2, padding: [3, 7], height: BADGE_H - 8, lineHeight: BADGE_H - 8}}]};
   });
   ch.setOption({series: marks.map(markPoint => ({markPoint}))});
 }
