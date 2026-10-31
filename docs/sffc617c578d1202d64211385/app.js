@@ -73,7 +73,7 @@ const b64 = s => Uint8Array.from(atob(s), ch => ch.charCodeAt(0));
 const t = s => new Date(s.updated).getTime();
 
 let DATA = null, charts = {}, fails = 0;
-const state = {range: 0, off: new Set(), mode: "total", sort: {key: "total", asc: false}, sel: null};
+const state = {range: 0, off: new Set(), mode: "total", sort: {key: "total", asc: false}, sel: null, tab: "social"};
 
 // ---- theme --------------------------------------------------------------------------
 try { const th = localStorage.getItem("ink-theme"); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
@@ -179,6 +179,7 @@ function start() {
   $("range").onclick = e => { const b = e.target.closest("button"); if (!b) return; state.range = +b.dataset.r; renderAll(); };
   $("viewMode").onclick = e => { const b = e.target.closest("button"); if (!b) return; state.mode = b.dataset.m; renderAll(); };
   $("closeDetail").onclick = () => { state.sel = null; renderAll(); };
+  $("tab").onclick = e => { const b = e.target.closest("button"); if (!b) return; state.tab = b.dataset.t; renderAll(); };
   addEventListener("resize", () => Object.values(charts).forEach(c => c.resize()));
   renderAll();
 }
@@ -608,6 +609,73 @@ function renderAll() {
   $("updated").textContent = `Updated ${new Date(now.updated).toLocaleString([], {dateStyle: "medium", timeStyle: "short"})}` +
     ` · ${snaps().length} snapshot${snaps().length === 1 ? "" : "s"} since ${new Date(snaps()[0].updated).toLocaleDateString([], {month: "short", day: "numeric"})}` +
     (errs.length ? ` · couldn't refresh: ${errs.join(", ")}` : "");
+  const web = state.tab === "web";
+  document.querySelectorAll("#tab button").forEach(b => b.classList.toggle("on", b.dataset.t === state.tab));
+  $("socialView").hidden = web; $("webView").hidden = !web; $("platformChips").hidden = web;
+  if (web) { renderWeb(); return; }
   renderChanges(); renderTiles(); renderTrend(); renderEngTrend(); renderEngPosts(); renderMix(); renderBoard(); renderDetail(); renderComments();
   preloadBig();
+}
+
+// ---- website tab (Cloudflare counter: per-day rows from analytics.report) -------------
+const dayKey = d => d.toISOString().slice(0, 10);
+function webCut(rows) {   // rows in the chosen range (24 h = today, UTC days like the counter)
+  if (!state.range) return rows;
+  const from = dayKey(new Date(Date.now() - (state.range - 1) * 864e5));
+  return rows.filter(r => r.day >= from);
+}
+function webSum(rows, keyOf = r => r.k) {   // {key: {views, visitors, dur, timed}}
+  const out = {};
+  for (const r of rows) {
+    const o = out[keyOf(r)] || (out[keyOf(r)] = {views: 0, visitors: 0, dur: 0, timed: 0});
+    o.views += r.views; o.visitors += r.visitors; o.dur += r.dur || 0; o.timed += r.timed || 0;
+  }
+  return out;
+}
+const avgTime = o => o.timed ? o.dur / o.timed / 1000 : null;
+const secs = s => s == null ? "–" : s < 60 ? `${fmt(s, s < 10 ? 1 : 0)} s` : `${Math.floor(s / 60)} m ${String(Math.round(s % 60)).padStart(2, "0")} s`;
+function pageName(path) {   // "/ink-idea-and-ai-public/cartoons/3-free-trial/" -> No. 3 circle + title
+  const m = /cartoons\/(\d+)-[^/]*\/?$/.exec(path || "");
+  if (m) { const c = latest().cartoons[m[1]]; return `${num(m[1])} ${esc(c ? c.title : "")}`; }
+  if (/\/(ink-idea-and-ai-public\/?)?$/.test(path || "/")) return "Homepage";
+  return esc(path.replace("/ink-idea-and-ai-public", "") || "/");
+}
+const FLAG = cc => cc && cc.length === 2 ? String.fromCodePoint(...[...cc.toUpperCase()].map(ch => 127397 + ch.charCodeAt(0))) + " " + cc : "Unknown";
+function webTable(id, rows, label, name, share = true) {
+  const list = Object.entries(webSum(webCut(rows))).sort((a, b) => b[1].views - a[1].views);
+  const total = list.reduce((a, [, o]) => a + o.views, 0) || 1;
+  $(id).innerHTML = `<thead><tr><th>${label}</th><th>Views</th>${share ? "<th>Share</th>" : ""}<th>Visitors</th><th>Avg time</th></tr></thead><tbody>` +
+    (list.length ? list.map(([k, o]) => `<tr><td>${name(k)}</td><td>${fmt(o.views)}</td>${share ? `<td>${fmt(o.views / total * 100)}%</td>` : ""}` +
+      `<td>${fmt(o.visitors)}</td><td>${secs(avgTime(o))}</td></tr>`).join("") : `<tr><td colspan="${share ? 5 : 4}" class="muted">No visits in this range.</td></tr>`) +
+    "</tbody>";
+}
+function renderWeb() {
+  const W = DATA.web;
+  $("webEmpty").hidden = !!(W && W.daily && W.daily.length);
+  if (!W || !W.daily) { $("webTiles").innerHTML = ""; return; }
+  const days = webCut(W.daily), all = Object.values(webSum(days, () => "all"))[0] || {views: 0, visitors: 0, dur: 0, timed: 0};
+  const pages = webSum(webCut(W.path)), top = Object.entries(pages).filter(([k]) => /cartoons\//.test(k)).sort((a, b) => b[1].views - a[1].views)[0];
+  const tiles = [
+    ["Page views", fmt(all.views), RANGE_LABEL[state.range]],
+    ["Visitors", fmt(all.visitors), "unique per day, added up"],
+    ["Avg time on page", secs(avgTime(all)), "while the page was on screen"],
+    ["Pages per visitor", all.visitors ? fmt(all.views / all.visitors, 1) : "–", ""],
+    ["Top cartoon page", top ? pageName(top[0]) : "–", top ? `${fmt(top[1].views)} views · ${secs(avgTime(top[1]))}` : ""],
+  ];
+  $("webTiles").innerHTML = tiles.map(([k, v, d]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join("");
+  const o = base(), byDay = days.map(r => r.day);
+  chart("cWeb").setOption({
+    ...o, legend: {show: false},
+    tooltip: {...o.tooltip, axisPointer: {type: "shadow"}, valueFormatter: v => fmt(v)},
+    xAxis: {...o.xAxis, type: "category", data: byDay.map(d => new Date(d + "T12:00:00Z").toLocaleDateString([], {month: "short", day: "numeric"}))},
+    yAxis: {...o.yAxis, type: "value", minInterval: 1},
+    series: [{name: "Page views", type: "bar", barMaxWidth: 26, data: days.map(r => r.views), itemStyle: {color: css("--s4"), borderRadius: [4, 4, 0, 0]}},
+             {name: "Visitors", type: "line", smooth: .25, symbol: "circle", symbolSize: 7, data: days.map(r => r.visitors),
+              lineStyle: {width: 2}, itemStyle: {color: css("--accent")}}],
+  }, true);
+  webTable("webPages", W.path, "Page", pageName);
+  webTable("webRefs", W.ref, "Source", k => k ? esc(k) : "Direct / unknown", false);
+  webTable("webCountries", W.country, "Country", FLAG, false);
+  webTable("webDevices", W.device, "Device", k => esc(k ? k[0].toUpperCase() + k.slice(1) : "Unknown"), false);
+  chart("cWeb").resize();
 }
