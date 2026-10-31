@@ -163,8 +163,9 @@ const latest = () => snaps()[snaps().length - 1];
 const on = () => PLAT.filter(p => !state.off.has(p.k));
 const views = (c, k) => (c && c[k] && c[k].views) || 0;
 const inter = d => d ? (d.likes || 0) + (d.comments || 0) + (d.shares || 0) + (d.saves || 0) : 0;
-const eng = (c, k) => on().reduce((a, p) => a + ((c && c[p.k] && c[p.k][k]) || 0), 0);   // one kind, enabled platforms
-const engAll = (s, k) => Object.values(s.cartoons).reduce((a, c) => a + eng(c, k), 0);
+const onGraph = () => on().filter(p => p.k !== "instagram_reel");   // graphs chart Instagram by its image post only
+const eng = (c, k, ps = on()) => ps.reduce((a, p) => a + ((c && c[p.k] && c[p.k][k]) || 0), 0);   // one kind, enabled platforms
+const engAll = (s, k, ps) => Object.values(s.cartoons).reduce((a, c) => a + eng(c, k, ps), 0);
 
 function inRange() {
   const all = snaps();
@@ -367,7 +368,7 @@ const platBadge = p => ({text: iconText(p.label), rich: richIcons(16), color: cs
 function renderTrend() {
   const r = inRange(), gain = state.mode === "gain", surface = css("--surface-1");
   document.querySelectorAll("#viewMode button").forEach(b => b.classList.toggle("on", b.dataset.m === state.mode));
-  const series = on().map(p => {
+  const series = onGraph().map(p => {
     const pts = r.map(s => [s.updated, totals(s)[p.k]]);
     const data = gain ? pts.slice(1).map((pt, i) => [pt[0], pt[1] - pts[i][1]]) : pts;
     return gain
@@ -398,11 +399,11 @@ function renderTrend() {
     graphic: r.length < 2 ? [{type: "text", left: "center", top: "middle",
       style: {text: "The trend fills in as refreshes come in (twice a day).", fill: css("--text-muted"), fontSize: 13}}] : [],
   }, true);
-  if (!gain) withBadges("cTrend", on().map(platBadge));
+  if (!gain) withBadges("cTrend", onGraph().map(platBadge));
 }
 
 function renderMix() {
-  const tt = totals(latest()), ps = on().slice().sort((a, b) => tt[a.k] - tt[b.k]), all = ps.reduce((a, p) => a + tt[p.k], 0) || 1;
+  const tt = totals(latest()), ps = onGraph().slice().sort((a, b) => tt[a.k] - tt[b.k]), all = ps.reduce((a, p) => a + tt[p.k], 0) || 1;
   const o = base();
   chart("cMix").setOption({
     ...o, legend: {show: false}, grid: {...o.grid, top: 8, right: 70},
@@ -425,17 +426,17 @@ function renderEngTrend() {
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
     series: ENG.map(([k, l, ic, c]) => ({
       name: k === "new_followers" ? `${ic} Followers (all platforms)` : `${ic} ${l}`, type: "line", step: "end", symbol: "circle", symbolSize: 8, showSymbol: r.length < 30,
-      data: r.map(s => [s.updated, k === "new_followers" ? allFollowers(s) : engAll(s, k)]),
+      data: r.map(s => [s.updated, k === "new_followers" ? allFollowers(s) : engAll(s, k, onGraph())]),
       lineStyle: {width: 2}, itemStyle: {color: css(c), borderColor: surface, borderWidth: 2}, emphasis: {focus: "series"}})),
   }, true);
   withBadges("cEngTrend", ENG.map(([k, l, ic, c]) => ({text: ic, color: css(c), w: 34})));
 }
 
 function renderEngPosts() {
-  const total = c => ENG.reduce((a, [k]) => a + eng(c, k), 0);
+  const total = c => ENG.reduce((a, [k]) => a + eng(c, k, onGraph()), 0);
   const cs = Object.entries(latest().cartoons).sort((a, b) => total(b[1]) - total(a[1]) || +a[0] - +b[0]),   // most engaged first
         o = base(), surface = css("--surface-1");
-  const any = cs.some(([, c]) => ENG.some(([k]) => eng(c, k)));
+  const any = cs.some(([, c]) => ENG.some(([k]) => eng(c, k, onGraph())));
   chart("cEngPosts").setOption({
     ...o, legend: {...o.legend, formatter: n => n},
     tooltip: {...o.tooltip, axisPointer: {type: "shadow"},
@@ -444,7 +445,7 @@ function renderEngPosts() {
             axisLabel: {...o.xAxis.axisLabel, interval: 0, fontSize: 11, lineHeight: 14}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
     series: ENG.map(([k, l, ic, c], i) => ({
-      name: `${ic} ${l}`, type: "bar", stack: "eng", barMaxWidth: 34, data: cs.map(([, cc]) => eng(cc, k)),
+      name: `${ic} ${l}`, type: "bar", stack: "eng", barMaxWidth: 34, data: cs.map(([, cc]) => eng(cc, k, onGraph())),
       itemStyle: {color: css(c), borderColor: surface, borderWidth: 1,
                   borderRadius: i === ENG.length - 1 ? [4, 4, 0, 0] : 0}, emphasis: {focus: "series"}})),
     graphic: any ? [] : [{type: "text", left: "center", top: "middle",
@@ -541,7 +542,7 @@ function renderDetail() {
   $("detailTitle").innerHTML = `${thumb(n, "thumb lg")}No. ${n} · ${esc(c.title)}`;
   const r = inRange(), o = base(), surface = css("--surface-1");
   chart("cDetail").resize();
-  const ps = on().filter(p => c[p.k]);
+  const ps = onGraph().filter(p => c[p.k]);
   chart("cDetail").setOption({
     ...o, legend: {show: false},
     tooltip: {...o.tooltip, valueFormatter: v => fmt(v)},
