@@ -7,6 +7,7 @@ const PLAT = [
   {k: "tiktok", label: "TikTok", c: "--s1", brand: "tiktok", tag: ""},
   {k: "instagram_reel", label: "Instagram", c: "--s2", brand: "instagram", tag: ""},   // the Reel: shown as plain Instagram
   {k: "youtube", label: "YouTube", c: "--s6", brand: "youtube", tag: ""},
+  {k: "facebook", label: "Facebook", c: "--s7", brand: "facebook", tag: ""},
   {k: "instagram_image", label: "IG image", c: "--s3", brand: "instagram", tag: "image"},
   {k: "threads", label: "Threads", c: "--s5", brand: "threads", tag: ""},
   {k: "x", label: "X", c: "--s4", brand: "x", tag: ""},
@@ -18,6 +19,7 @@ const GLYPH = {
   instagram: '<rect x="2.5" y="2.5" width="19" height="19" rx="5.5" fill="none" stroke="F" stroke-width="2.2"/><circle cx="12" cy="12" r="4.4" fill="none" stroke="F" stroke-width="2.2"/><circle cx="17.6" cy="6.4" r="1.4"/>',
   x: '<path d="M18.24 2.25h3.31l-7.23 8.26 8.5 11.24H16.17l-5.21-6.82-5.97 6.82H1.68l7.73-8.84L1.25 2.25H8.08l4.71 6.23zm-1.16 17.52h1.83L7.08 4.13H5.12z"/>',
   youtube: '<path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8zM9.6 15.6V8.4l6.3 3.6z"/>',
+  facebook: '<path d="M24 12a12 12 0 1 0-13.9 11.9v-8.4H7.1V12h3V9.4c0-3 1.8-4.7 4.5-4.7 1.3 0 2.7.2 2.7.2v3h-1.5c-1.5 0-2 .9-2 1.9V12h3.4l-.5 3.5h-2.9v8.4A12 12 0 0 0 24 12z"/>',
   threads: '<path fill="none" stroke="F" stroke-width="2.2" stroke-linecap="round" d="M16.2 11.2c-.5-2.6-2.3-3.7-4.3-3.7-2.3 0-3.7 1.3-3.9 3 M16.3 12.4c0 3-1.6 4.3-3.9 4.3-1.9 0-3.1-1-3.1-2.4 0-1.7 1.6-2.6 3.8-2.6 3.7 0 6.4 1.4 6.4 4.4 0 3.3-3 5.6-7 5.6-5.3 0-8.3-3.6-8.3-9 0-5.5 3.2-9 8.4-9 4.2 0 6.9 2 7.9 5.6"/>',
 };
 // Brand colours where the brand has them (TikTok, Instagram, YouTube); X and Threads are black-only marks, so
@@ -30,6 +32,7 @@ const COLOR_GLYPH = {
     '<stop offset=".9" stop-color="#285aeb"/></radialGradient></defs><rect x="1" y="1" width="22" height="22" rx="6.5" fill="url(#ig)"/>' +
     '<rect x="5.6" y="5.6" width="12.8" height="12.8" rx="4" fill="none" stroke="#fff" stroke-width="1.9"/>' +
     '<circle cx="12" cy="12" r="3.1" fill="none" stroke="#fff" stroke-width="1.9"/><circle cx="16.4" cy="7.6" r="1.1" fill="#fff"/>',
+  facebook: () => '<circle cx="12" cy="12" r="12" fill="#1877f2"/><path fill="#fff" d="M16.7 15.5l.5-3.5h-3.4V9.8c0-1 .5-1.9 2-1.9h1.5v-3s-1.4-.2-2.7-.2c-2.7 0-4.5 1.7-4.5 4.7V12h-3v3.5h3V24a12 12 0 0 0 3.7 0v-8.5z"/>',
   youtube: () => '<rect x="0" y="3.6" width="24" height="16.8" rx="4.6" fill="#ff0000"/><path fill="#fff" d="M9.6 15.6V8.4l6.3 3.6z"/>',
 };
 const logo = brand => {
@@ -51,7 +54,7 @@ const numRich = (size = 18) => ({backgroundColor: css("--num"), color: "#fff", b
                                  lineHeight: size, align: "center", fontSize: Math.round(size * .6), fontWeight: "bold"});
 const iconHtml = p => `<img src="${logo(p.brand)}" alt="${esc(p.label)}" title="${esc(p.label)}" class="pl">` +
   (p.tag ? `<span class="pltag">${p.tag}</span>` : "");
-const FOLLOW = [["tiktok", "TikTok", "--s1"], ["instagram", "Instagram", "--s2"], ["x", "X", "--s4"], ["threads", "Threads", "--s5"]];
+const FOLLOW = [["tiktok", "TikTok", "--s1"], ["instagram", "Instagram", "--s2"], ["facebook", "Facebook", "--s7"], ["x", "X", "--s4"], ["threads", "Threads", "--s5"]];
 const FOLLOW_P = FOLLOW.map(([k, label]) => ({brand: k, label, tag: ""}));
 const ENG = [["likes", "Likes", "👍", "--e1"], ["comments", "Comments", "💬", "--e2"], ["shares", "Shares", "↗", "--e3"],
              ["saves", "Saves", "🔖", "--e4"], ["new_followers", "New followers", "👤", "--e5"]];
