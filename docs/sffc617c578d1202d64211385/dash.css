@@ -7,6 +7,7 @@
   --text-secondary: #52514e;
   --text-muted: #8a857b;
   --accent: #c8892b;      /* brand gold: UI only, never a series */
+  --num: #2563eb;         /* cartoon number circles */
   --grid: #ece5d6;
   --good: #1f7a3a; --bad: #b3261e;
   /* videos = greens (TikTok, IG Reel), images = yellow (IG image), posts = blues (X, Threads) */
@@ -157,3 +158,9 @@ img.pl { width: 16px; height: 16px; vertical-align: -3px; }
 .cm-reply { margin: 8px 0 0 18px; border-left: 3px solid var(--grid); border-radius: 0 8px 8px 0; background: color-mix(in srgb, var(--accent) 5%, transparent); }
 .cm-ours > .cm-h b { color: var(--accent); }
 .cm-needs { border-color: var(--bad); color: var(--bad); }
+
+/* cartoon numbers: white on a blue circle */
+.num { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px;
+       box-sizing: border-box; border-radius: 999px; background: var(--num); color: #fff; font-size: 11px; font-weight: 700;
+       line-height: 1; vertical-align: 1px; margin-right: 2px; }
+.num.lg { min-width: 40px; height: 40px; font-size: 20px; }
