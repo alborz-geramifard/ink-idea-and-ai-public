@@ -61,7 +61,7 @@ ul.pills li { flex: 0 0 calc((100% - 36px) / 4); }   /* 4 + 3, the short row cen
 ul.pills a { display: flex; align-items: center; gap: 10px; padding: 11px 14px 11px 12px; border-radius: 999px;
              background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow);
              color: var(--ink); text-decoration: none; font: 500 15px/1.2 var(--sans);
-             transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+             transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease, background-color .15s ease; }
 ul.pills a:hover, ul.pills a:focus-visible { transform: translateY(-2px); border-color: var(--gold); outline: none;
              box-shadow: 0 2px 4px rgba(40, 30, 10, .08), 0 10px 24px rgba(40, 30, 10, .10); }
 ul.pills svg.icon { width: 24px; height: 24px; flex: none; }
@@ -72,7 +72,7 @@ ul.pills.icons li { flex: 0 0 auto; }
 ul.pills.icons a { width: 56px; height: 56px; padding: 0; justify-content: center; background: none; border: 0; box-shadow: none;
                    border-radius: 50%; }
 ul.pills.icons a:hover, ul.pills.icons a:focus-visible { box-shadow: none; transform: translateY(-2px) scale(1.12); }
-ul.pills.icons svg.icon { width: 26px; height: 26px; filter: grayscale(1); opacity: .6; transition: filter .2s ease, opacity .2s ease; }
+ul.pills.icons svg.icon { width: 32px; height: 32px; filter: grayscale(1); opacity: .6; transition: filter .2s ease, opacity .2s ease; }
 ul.pills.icons a:hover svg.icon, ul.pills.icons a:focus-visible svg.icon { filter: none; opacity: 1; }
 
 /* the publishing tool: a quiet card */
@@ -119,8 +119,8 @@ ul.thumbs img { display: block; width: 100%; height: auto; border-radius: 10px; 
 ul.thumbs a:hover img { transform: translateY(-3px); box-shadow: 0 2px 4px rgba(40, 30, 10, .08), 0 10px 24px rgba(40, 30, 10, .12); }
 ul.thumbs b { color: var(--gold); font-weight: 700; margin-right: 2px; }
 /* channel links: the round icon buttons, a little smaller */
-ul.pills.channels a { width: 48px; height: 48px; }
-ul.pills.channels svg.icon { width: 22px; height: 22px; }
+ul.pills.channels a { width: 52px; height: 52px; }
+ul.pills.channels svg.icon { width: 30px; height: 30px; }
 ul.pills.small { justify-content: flex-start; gap: 7px; flex-wrap: nowrap; }
 ul.pills.small a { width: 40px; height: 40px; }
 ul.pills.small svg.icon { width: 19px; height: 19px; }
@@ -200,7 +200,7 @@ nav.topbar ul.links a:hover, nav.topbar ul.links a:focus-visible, nav.topbar ul.
 .share-menu a, .share-menu .copy { display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0;
               border-radius: 50%; background: none; color: var(--ink); cursor: pointer; transition: background-color .15s ease; }
 .share-menu a:hover, .share-menu .copy:hover, .share-menu a:focus-visible, .share-menu .copy:focus-visible { background: var(--logo-soft); outline: none; }
-.share-menu svg { width: 20px; height: 20px; }
+.share-menu svg { width: 23px; height: 23px; }
 .share-menu .copy .check, .share-menu .copy.done svg:not(.check) { display: none; }
 .share-menu .copy.done .check { display: block; color: #2e8b57; }
 @media (max-width: 520px) { .share { top: 8px; right: 8px; } }
