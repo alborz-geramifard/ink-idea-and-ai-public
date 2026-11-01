@@ -178,3 +178,7 @@ a.icon.sitelink { width: auto; padding: 0 12px; display: inline-flex; align-item
 a.icon.sitelink:hover { color: var(--text-primary); border-color: var(--accent); }
 .board.web td a { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
 .board.web td a:hover { text-decoration: underline; }
+
+/* refresh button spins while fresh numbers are on the way */
+#refresh.spin { animation: spin 1.2s linear infinite; cursor: progress; }
+@keyframes spin { to { transform: rotate(360deg); } }
