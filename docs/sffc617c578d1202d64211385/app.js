@@ -79,7 +79,16 @@ const SESSION = "ink-session";
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, ch => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[ch]));
-const fmt = (n, d = 0) => n == null ? "–" : Number(n).toLocaleString(undefined, {maximumFractionDigits: d, minimumFractionDigits: d});
+// 1,000 and up (user, 2026-11-01): 1.2K, 12K, 1.2M, 12M (one decimal only while a single digit)
+const fmt = (n, d = 0) => {
+  if (n == null) return "–";
+  const v = Number(n), a = Math.abs(v);
+  if (a < 1000) return v.toLocaleString(undefined, {maximumFractionDigits: d, minimumFractionDigits: d});
+  const short = (x, unit) => { const r = Math.round(x * 10) / 10; return (Math.abs(r) < 10 ? r.toFixed(1) : String(Math.round(x))) + unit; };
+  const m = v / 1e6;
+  if (a >= 1e6 || Math.round(Math.abs(v / 1e3)) >= 1000) return short(m, "M");
+  return short(v / 1e3, "K");
+};
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const b64 = s => Uint8Array.from(atob(s), ch => ch.charCodeAt(0));
 const t = s => new Date(s.updated).getTime();
@@ -365,7 +374,7 @@ function base() {
     legend: {top: 0, left: 0, icon: "circle", itemWidth: 10, itemHeight: 10, itemGap: 16, formatter: iconText,
              textStyle: {color: css("--text-secondary"), rich: richIcons()}},
     xAxis: {axisLine: {lineStyle: {color: grid}}, axisTick: {show: false}, axisLabel: {color: muted}, splitLine: {show: false}},
-    yAxis: {axisLine: {show: false}, splitLine: {lineStyle: {color: grid}}, axisLabel: {color: muted}},
+    yAxis: {axisLine: {show: false}, splitLine: {lineStyle: {color: grid}}, axisLabel: {color: muted, formatter: v => fmt(v)}},
   };
 }
 // time axes: the date where a day starts (shown bold by ECharts), times of day in between only when zoomed in
