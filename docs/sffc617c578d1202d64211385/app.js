@@ -462,16 +462,22 @@ function renderEngPosts() {
         o = base(), surface = css("--surface-1");
   const any = cs.some(([, c]) => ENG.some(([k]) => eng(c, k)));
   chart("cEngPosts").setOption({
-    ...o, legend: {...o.legend, formatter: n => n},
-    tooltip: {...o.tooltip, axisPointer: {type: "shadow"},
-              formatter: ps => `<b>${ps[0].axisValueLabel.replace(/^\{num\|(\d+)\}\n(.*)$/s, (m, n, title) => `${num(n)} ${esc(title)}`)}</b><br>` + ps.map(x => `${x.marker}${x.seriesName}: <b>${fmt(x.value)}</b>`).join("<br>")},
+    ...o, legend: {...o.legend, formatter: n => n}, grid: {...o.grid, top: 60},
+    tooltip: {...o.tooltip, trigger: "item",   // the views bar shows views; the stack shows its engagement
+              formatter: p => { const [n, c] = cs[p.dataIndex], head = `<b>${num(n)} ${esc(c.title)}</b><br>`;
+                return head + (p.seriesName === "👁 Views" ? `${p.marker}Views: <b>${fmt(p.value)}</b>`
+                  : ENG.map(([k, l, ic, col]) => `<span style="color:${css(col)}">●</span> ${ic} ${l}: <b>${fmt(eng(c, k))}</b>`).join("<br>")); }},
     xAxis: {...o.xAxis, type: "category", data: cs.map(([n, c]) => `{num|${n}}\n${c.title}`),
             axisLabel: {...o.xAxis.axisLabel, interval: 0, fontSize: 11, lineHeight: 16, rich: {num: numRich(16)}}},
-    yAxis: {...o.yAxis, type: "value", minInterval: 1},
-    series: ENG.map(([k, l, ic, c], i) => ({
+    yAxis: [{...o.yAxis, type: "value", minInterval: 1, name: "Engagement", nameTextStyle: {color: css("--text-muted"), align: "left"}},
+            {...o.yAxis, type: "value", minInterval: 1, position: "right", splitLine: {show: false}, name: "Views",   // total views on the right
+             nameTextStyle: {color: css("--text-muted"), align: "right"}}],
+    series: [...ENG.map(([k, l, ic, c], i) => ({
       name: `${ic} ${l}`, type: "bar", stack: "eng", barMaxWidth: 34, data: cs.map(([, cc]) => eng(cc, k)),
       itemStyle: {color: css(c), borderColor: surface, borderWidth: 1,
                   borderRadius: i === ENG.length - 1 ? [4, 4, 0, 0] : 0}, emphasis: {focus: "series"}})),
+      {name: "👁 Views", type: "bar", yAxisIndex: 1, barMaxWidth: 34, barGap: "15%", data: cs.map(([, cc]) => cartoonViews(cc)),   // beside the stack
+       itemStyle: {color: css("--text-muted"), opacity: 0.55, borderRadius: [4, 4, 0, 0]}, emphasis: {focus: "series"}}],
     graphic: any ? [] : [{type: "text", left: "center", top: "middle",
       style: {text: "No likes, comments, shares or saves yet on the selected platforms.", fill: css("--text-muted"), fontSize: 13}}],
   }, true);
