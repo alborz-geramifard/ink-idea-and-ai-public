@@ -568,9 +568,10 @@ function renderAge() {
       const c = all[p[2]].cartoons[n];
       const rows = on().map(pl => [pl, views(c, pl.k)]).filter(([, v]) => v).sort((a, b) => b[1] - a[1]);
       return `<b>${num(n)} ${esc(title(n))}</b> · ${age(p[0])} after posting<br>` +
+        `Total: <b>${fmt(p[1])}</b><br>` +   // the total first (user, 2026-11-01), then each platform
         (shown.length > 1   // several lines: one row of numbers each, so the box stays short
-          ? rows.map(([pl, v]) => `${iconHtml(pl)} <b>${fmt(v)}</b>`).join("&nbsp;&nbsp;") + `<br>Total: <b>${fmt(p[1])}</b>`
-          : rows.map(([pl, v]) => `${iconHtml(pl)} <b>${fmt(v)}</b>`).join("<br>") + `<br>Total: <b>${fmt(p[1])}</b>`);
+          ? rows.map(([pl, v]) => `${iconHtml(pl)} <b>${fmt(v)}</b>`).join("&nbsp;&nbsp;")
+          : rows.map(([pl, v]) => `${iconHtml(pl)} <b>${fmt(v)}</b>`).join("<br>"));
     }).join(`<hr style="border:0;border-top:1px solid ${css("--border")};margin:6px 0">`);
   };
   ch.setOption({
@@ -703,7 +704,7 @@ function renderBoard() {
   });
   const {key, asc} = state.sort;
   rows.sort((a, b) => ((key === "n" ? a.n - b.n : (a[key] ?? -1) - (b[key] ?? -1))) * (asc ? 1 : -1));
-  const cols = [["n", "Cartoon"], ...ps.map(p => [p.k, iconHtml(p)]), ["total", "Total"], ...ENG.map(([k, l, ic]) => [k, `<span title="${l}">${ic}</span>`]),
+  const cols = [["n", "Cartoon"], ["total", "Views"], ...ps.map(p => [p.k, iconHtml(p)]), ["inter", `<span title="All interactions: likes, comments, shares, saves">Interactions</span>`], ...ENG.map(([k, l, ic]) => [k, `<span title="${l}">${ic}</span>`]),
                 ["rate", `<span title="Engagement rate: interactions per 100 views">Eng %</span>`],
                 ["tw", `<span title="TikTok average watch time">⏱ ${iconHtml(PLAT[0])}</span>`],
                 ["tc", `<span title="TikTok: watched to the end">✓ ${iconHtml(PLAT[0])}</span>`],
@@ -713,8 +714,8 @@ function renderBoard() {
       `<th ${k ? `data-k="${k}"` : ""} class="${k === key ? "sorted" + (asc ? " asc" : "") : ""}">${l}</th>`).join("")}</tr></thead><tbody>` +
     rows.map(row => `<tr data-n="${row.n}" class="${row.n === state.sel ? "sel" : ""}">
       <td><div class="cell-cartoon">${thumb(row.n)}<span>${num(row.n)} ${esc(row.c.title)}${row.c.format ? `<span class="badge ${row.c.format}">${row.c.format}</span>` : ""}</span></div></td>
-      ${ps.map(p => `<td>${fmt(row[p.k])}</td>`).join("")}
-      <td><b>${fmt(row.total)}</b></td>${ENG.map(([k]) => `<td class="${row[k] ? "" : "muted"}">${fmt(row[k])}</td>`).join("")}
+      <td><b>${fmt(row.total)}</b></td>${ps.map(p => `<td>${fmt(row[p.k])}</td>`).join("")}
+      <td><b>${fmt(row.inter)}</b></td>${ENG.map(([k]) => `<td class="${row[k] ? "" : "muted"}">${fmt(row[k])}</td>`).join("")}
       <td>${row.rate == null ? "–" : fmt(row.rate, 1) + "%"}</td><td>${row.tw == null ? "–" : fmt(row.tw, 1) + " s"}</td>
       <td>${row.tc == null ? "–" : fmt(row.tc, 1) + "%"}</td><td>${row.rw == null ? "–" : fmt(row.rw, 1) + " s"}</td>
       <td>${row.change == null ? `<span class="muted">–</span>` : delta(row.total, row.total - row.change)}</td>
@@ -738,18 +739,30 @@ function renderDetail() {
   $("detail").hidden = !c;
   if (!c) return;
   $("detailTitle").innerHTML = `${thumb(n, "thumb lg")}${num(n)} ${esc(c.title)}`;
-  const r = inRange(), o = base(), surface = css("--surface-1");
+  // the post's whole life, whatever the page's range buttons say (user, 2026-11-01): from posting to the latest reading
+  const r = snaps().filter(s => s.cartoons[n]), o = base(), surface = css("--surface-1");
+  const born = postedAt(c), from = born ? Math.min(new Date(born).getTime(), r.length ? t(r[0]) : Infinity) : undefined;
   chart("cDetail").resize();
   const ps = on().filter(p => c[p.k]);
+  const lead = p => {   // posted before tracking began: start the line at 0 views when that platform posted
+    const at = c[p.k] && c[p.k].posted_at;
+    return at && r.length && new Date(at).getTime() < t(r[0]) ? [[at, 0]] : [];
+  };
   chart("cDetail").setOption({
     ...o, legend: {show: false},
     tooltip: {...o.tooltip, formatter: platTip},
-    xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
+    xAxis: {...o.xAxis, type: "time", min: from, max: r.length ? t(r[r.length - 1]) : undefined,
+            ...dayTicks(born ? [{updated: born}, ...r] : r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
     series: ps.map(p => ({
       name: p.label, type: "line", symbol: "circle", symbolSize: 8, showSymbol: r.length < 30, connectNulls: true,
       data: r.map(s => [s.updated, s.cartoons[n] && s.cartoons[n][p.k] ? s.cartoons[n][p.k].views : null]),
-      lineStyle: {width: 2}, itemStyle: {color: css(p.c), borderColor: surface, borderWidth: 2}})),
+      lineStyle: {width: 2}, itemStyle: {color: css(p.c), borderColor: surface, borderWidth: 2}})).concat(
+      // posted before tracking began: a dashed line from 0 at posting to the first reading (after the badged lines)
+      ps.map(p => { const l = lead(p), f = r.find(s => s.cartoons[n] && s.cartoons[n][p.k]);
+        return l.length && f ? {name: p.label, type: "line", silent: true, showSymbol: false, tooltip: {show: false},
+          data: [...l, [f.updated, f.cartoons[n][p.k].views]], lineStyle: {width: 1, type: "dashed", opacity: .5, color: css(p.c)}} : null; })
+        .filter(Boolean)),
     graphic: r.length < 2 ? [{type: "text", left: "center", top: "middle",
       style: {text: "History builds up with each refresh.", fill: css("--text-muted"), fontSize: 13}}] : [],
   }, true);
