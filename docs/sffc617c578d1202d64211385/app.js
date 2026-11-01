@@ -483,7 +483,7 @@ function renderEngTrend() {
   const r = inRange(), o = base(), surface = css("--surface-1");
   chart("cEngTrend").setOption({
     ...o, legend: {show: false},
-    tooltip: {...o.tooltip, valueFormatter: v => fmt(v)},
+    tooltip: {...o.tooltip, order: "valueDesc", valueFormatter: v => fmt(v)},   // biggest first
     xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
     series: ENG.map(([k, l, ic, c]) => ({
