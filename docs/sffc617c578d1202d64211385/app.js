@@ -4,15 +4,15 @@
 // this browser's storage for SESSION_MS so reloads don't ask again; Lock signs out and deletes it.
 
 const PLAT = [
-  {k: "tiktok", label: "TikTok", c: "--s1", brand: "tiktok", tag: ""},
-  {k: "instagram_reel", label: "Instagram", c: "--s2", brand: "instagram", tag: ""},   // the Reel: shown as plain Instagram
-  {k: "youtube", label: "YouTube", c: "--s6", brand: "youtube", tag: ""},
-  {k: "facebook", label: "Facebook", c: "--s7", brand: "facebook", tag: ""},
-  {k: "pinterest", label: "Pinterest", c: "--s8", brand: "pinterest", tag: ""},
-  {k: "linkedin", label: "LinkedIn", c: "--s9", brand: "linkedin", tag: ""},
-  {k: "instagram_image", label: "IG image", c: "--s3", brand: "instagram", tag: "image"},
-  {k: "threads", label: "Threads", c: "--s5", brand: "threads", tag: ""},
-  {k: "x", label: "X", c: "--s4", brand: "x", tag: ""},
+  {k: "tiktok", label: "TikTok", c: "--p-tiktok", brand: "tiktok", tag: ""},
+  {k: "instagram_reel", label: "Instagram", c: "--p-ig", brand: "instagram", tag: ""},   // the Reel: shown as plain Instagram
+  {k: "youtube", label: "YouTube", c: "--p-yt", brand: "youtube", tag: ""},
+  {k: "facebook", label: "Facebook", c: "--p-fb", brand: "facebook", tag: ""},
+  {k: "pinterest", label: "Pinterest", c: "--p-pin", brand: "pinterest", tag: ""},
+  {k: "linkedin", label: "LinkedIn", c: "--p-li", brand: "linkedin", tag: ""},
+  {k: "instagram_image", label: "IG image", c: "--p-igimg", brand: "instagram", tag: "image"},
+  {k: "threads", label: "Threads", c: "--p-threads", brand: "threads", tag: ""},
+  {k: "x", label: "X", c: "--p-x", brand: "x", tag: ""},
 ];
 
 // Platform logos (monochrome, drawn in the text colour so they work in light and dark)
@@ -69,7 +69,16 @@ const numRich = (size = 18) => ({backgroundColor: css("--num"), color: "#fff", b
                                  lineHeight: size, align: "center", fontSize: Math.round(size * .6), fontWeight: "bold"});
 const iconHtml = p => `<img src="${logo(p.brand)}" alt="${esc(p.label)}" title="${esc(p.label)}" class="pl">` +
   (p.tag === "image" ? `<img src="${PHOTO}" alt="image" title="${esc(p.label)}" class="pl pltag-img">` : p.tag ? `<span class="pltag">${p.tag}</span>` : "");
-const FOLLOW = [["tiktok", "TikTok", "--s1"], ["instagram", "Instagram", "--s2"], ["facebook", "Facebook", "--s7"], ["pinterest", "Pinterest", "--s8"], ["linkedin", "LinkedIn", "--s9"], ["x", "X", "--s4"], ["threads", "Threads", "--s5"]];
+const FOLLOW = [["tiktok", "TikTok", "--p-tiktok"], ["instagram", "Instagram", "--p-ig"], ["facebook", "Facebook", "--p-fb"], ["pinterest", "Pinterest", "--p-pin"], ["linkedin", "LinkedIn", "--p-li"], ["x", "X", "--p-x"], ["threads", "Threads", "--p-threads"]];
+// X and TikTok are both black logos: TikTok's line is solid black, X's is dashed (user, 2026-11-01)
+const xDash = p => p.k === "x" ? {type: [7, 5]} : {};
+// one look for every line chart, the Views over time one (user, 2026-11-01): 2.5 px, a little see-through so
+// crossings show; hovering fades the other lines, nothing else changes
+const lineLook = (color, extra = {}) => ({
+  lineStyle: {width: 2.5, opacity: .75, color, ...extra}, itemStyle: {color, borderColor: css("--surface-1"), borderWidth: 2},
+  // hover keeps the same width and strength: on time charts every pointer move highlights and releases all
+  // lines, and a different hover look made them flicker (user, 2026-11-01)
+  emphasis: {focus: "series", lineStyle: {width: 2.5, opacity: .75, color, ...extra}}});
 const FOLLOW_P = FOLLOW.map(([k, label]) => ({brand: k, label, tag: ""}));
 const ENG = [["likes", "Likes", "👍", "--e1"], ["comments", "Comments", "💬", "--e2"], ["shares", "Shares", "↗", "--e3"],
              ["saves", "Saves", "🔖", "--e4"], ["new_followers", "New followers", "👤", "--e5"]];
@@ -343,17 +352,31 @@ function delta(now, then, d = 0) {
   if (Math.abs(x) < 10 ** -d / 2) return `<span class="muted">no change</span>`;
   return `<span class="${x > 0 ? "up" : "down"}">${x > 0 ? "▲ +" : "▼ −"}${fmt(Math.abs(x), d)}</span>`;
 }
+// "since your last visit" (user, 2026-11-01): this browser remembers when you last looked. A new visit starts after
+// VISIT_GAP_MS away; reloads and the 10-minute refreshes within one visit keep comparing to the same moment.
+const VISIT = "ink-last-visit", VISIT_GAP_MS = 30 * 60 * 1000;
+const visitBase = (() => {
+  try {
+    const now = Date.now(), v = JSON.parse(localStorage.getItem(VISIT) || "null");
+    const next = !v ? {base: null, at: now} : now - v.at > VISIT_GAP_MS ? {base: v.at, at: now} : {base: v.base, at: now};
+    localStorage.setItem(VISIT, JSON.stringify(next));
+    return next.base;
+  } catch (e) { return null; }
+})();
 function renderTiles() {
-  const r = inRange(), now = latest(), then = r.length > 1 ? r[0] : null, when = RANGE_LABEL[state.range];
+  const now = latest(), past = visitBase ? snaps().filter(s => t(s) <= visitBase) : [];
+  const then = past.length ? past[past.length - 1] : null;
+  const when = visitBase ? `since your visit ${ago(new Date(visitBase).toISOString())}` : "";
   const best = Object.entries(now.cartoons).sort((a, b) => cartoonViews(b[1]) - cartoonViews(a[1]))[0];
   const tiles = [
     ["Views", fmt(allViews(now)), delta(allViews(now), then && allViews(then)) + ` ${when}`],
-    ["Interactions", fmt(allInter(now)), delta(allInter(now), then && allInter(then)) + " · 👍 💬 ↗ 🔖"],
-    ["👤", fmt(allFollowers(now)), delta(allFollowers(now), then && allFollowers(then)) + " · all platforms"],
+    ["Interactions", fmt(allInter(now)), delta(allInter(now), then && allInter(then)) + ` ${when}`],
+    ["👤", fmt(allFollowers(now)), delta(allFollowers(now), then && allFollowers(then)) + ` ${when}`],
     [`${iconHtml(PLAT.find(p => p.k === "instagram_reel"))} watch time`, reelWatch(now) == null ? "–" : fmt(reelWatch(now), 1) + " s",
-     delta(reelWatch(now), then && reelWatch(then), 1) + " · median per video"],
+     delta(reelWatch(now), then && reelWatch(then), 1) + ` ${when}`],
     ["Top cartoon", best ? num(best[0], "lg") : "–", best ? `${esc(best[1].title)} · ${fmt(cartoonViews(best[1]))} views` : ""],
   ];
+  if (!then) tiles.slice(0, 4).forEach(x => { x[2] = `<span class="muted">changes since your last visit show from your next visit</span>`; });
   $("tiles").innerHTML = tiles.map(([k, v, d]) =>
     `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join("");
 }
@@ -385,7 +408,7 @@ const dayTicks = r => r.length > 1 && t(r[r.length - 1]) - t(r[0]) > 2 * 864e5 ?
 // Line charts name each line with a badge sitting on it instead of a legend. items[i] = {text, rich, w, color} for
 // series i. Every visible point is tried above and below its line; the spot farthest from the other lines and the
 // badges already placed wins (its own line must not cross it). Redone on zoom and resize, since pixels move.
-const BADGE_H = 26, BADGE_GAP = 6;
+const BADGE_H = 32, BADGE_GAP = 6;   // badges a bit bigger (user, 2026-11-01)
 function lineBadges(ch, items) {
   const opt = ch.getOption(), rect = ch.getModel().getComponent("grid").coordinateSystem.getRect(), surface = css("--surface-1");
   const px = opt.series.map((s, i) => s.type !== "line" ? [] :
@@ -438,7 +461,7 @@ function lineBadges(ch, items) {
     if (it.group) done.add(it.group);
     return {silent: true, animation: false, symbol: "circle", symbolSize: 1, itemStyle: {color: "transparent"},
       data: [{coord: best.coord, label: {show: true, position: best.dir < 0 ? "top" : "bottom", distance: BADGE_GAP,
-        formatter: it.text, rich: it.rich, color: css("--text-secondary"), backgroundColor: surface,
+        formatter: it.text, rich: it.rich, fontSize: it.fontSize || 12, color: css("--text-secondary"), backgroundColor: surface,
         borderRadius: BADGE_H / 2, padding: [3, 7], height: BADGE_H - 8, lineHeight: BADGE_H - 8}}]};
   });
   ch.setOption({series: marks.map(markPoint => ({markPoint}))});
@@ -475,15 +498,14 @@ function withBadges(id, items) {   // draw now and again whenever the visible wi
 }
 const platTip = ps => `<b>${ps[0].axisValueLabel}</b><br>` + ps.filter(x => x.value[1] != null).sort((a, b) => b.value[1] - a.value[1])
   .map(x => `${byLabel(x.seriesName) ? iconHtml(byLabel(x.seriesName)) : esc(x.seriesName)} <b>${fmt(x.value[1])}</b>`).join("<br>");   // logos, biggest first
-const platBadge = p => ({text: iconText(p.label), rich: richIcons(16), color: css(p.c), w: 16 + 14 + (p.tag === "image" ? 19 : p.tag ? p.tag.length * 7 + 4 : 0)});
+const platBadge = p => ({text: iconText(p.label), rich: richIcons(21), color: css(p.c), w: 21 + 14 + (p.tag === "image" ? 24 : p.tag ? p.tag.length * 7 + 4 : 0)});
 
 function renderTrend() {
   const r = inRange(), surface = css("--surface-1");
   const series = on().map(p => {
     const pts = r.map(s => [s.updated, totals(s)[p.k]]);
     return {name: p.label, type: "line", data: pts, smooth: .25, symbol: "circle", symbolSize: 8, showSymbol: pts.length < 30,
-            lineStyle: {width: 2}, itemStyle: {color: css(p.c), borderColor: surface, borderWidth: 2},
-            emphasis: {focus: "series"}};
+            ...lineLook(css(p.c), xDash(p))};
   });
   const lo = t(r[0]), hi = t(latest());
   const flags = Object.entries(latest().cartoons).map(([n, c]) => [n, postedAt(c)])
@@ -524,10 +546,7 @@ function renderAge() {
   const dark = document.documentElement.dataset.theme
     ? document.documentElement.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
   const hue = n => `hsl(${(+n * 137.5) % 360}, ${dark ? 70 : 62}%, ${dark ? 62 : 45}%)`;
-  const look = n => ({lineStyle: {width: 2, color: hue(n), opacity: .35}, itemStyle: {color: hue(n), borderColor: surface, borderWidth: 2},
-                emphasis: {focus: "series", lineStyle: {width: 3.5, color: hue(n), opacity: 1, shadowColor: hue(n), shadowBlur: 14},
-                           itemStyle: {color: hue(n), shadowColor: hue(n), shadowBlur: 10}},
-                blur: {lineStyle: {opacity: .12}}});
+  const look = n => ({...lineLook(hue(n)), emphasis: {focus: "none"}});   // no fading here: the hover box names the lines (user)
   const series = [
     ...lines.map(([n, data]) => ({name: n, type: "line", data, smooth: .25, showSymbol: false, symbol: "circle", symbolSize: 8, ...look(n)})),
     // posted before tracking began: a dashed line from 0 views at posting to the first reading
@@ -589,7 +608,7 @@ function renderAge() {
     graphic: series.length ? [] : [{type: "text", left: "center", top: "middle",
       style: {text: "No posted cartoons yet.", fill: muted, fontSize: 13}}],
   }, true);
-  const badge = n => ({text: `{num|${n}}`, rich: {num: numRich(22)}, w: 28, group: n});
+  const badge = n => ({text: `{num|${n}}`, rich: {num: {...numRich(22), backgroundColor: hue(n)}}, w: 28, group: n});   // circle = line colour
   withBadges("cAge", [...lines.map(([n]) => badge(n)),   // the dashed lead-ins badge their cartoon only when its solid line is out of view
                       ...lines.filter(([, d]) => d.length && d[0][0] > .1).map(([n]) => badge(n))]);
 }
@@ -620,9 +639,9 @@ function renderEngTrend() {
     series: ENG.map(([k, l, ic, c]) => ({
       name: ic, type: "line", step: "end", symbol: "circle", symbolSize: 8, showSymbol: r.length < 30,
       data: r.map(s => [s.updated, k === "new_followers" ? allFollowers(s) : engAll(s, k)]),
-      lineStyle: {width: 2}, itemStyle: {color: css(c), borderColor: surface, borderWidth: 2}, emphasis: {focus: "series"}})),
+      ...lineLook(css(c))})),
   }, true);
-  withBadges("cEngTrend", ENG.map(([k, l, ic, c]) => ({text: ic, color: css(c), w: 34})));
+  withBadges("cEngTrend", ENG.map(([k, l, ic, c]) => ({text: ic, fontSize: 19, color: css(c), w: 40})));
 }
 
 function renderEngPosts() {
@@ -757,11 +776,11 @@ function renderDetail() {
     series: ps.map(p => ({
       name: p.label, type: "line", symbol: "circle", symbolSize: 8, showSymbol: r.length < 30, connectNulls: true,
       data: r.map(s => [s.updated, s.cartoons[n] && s.cartoons[n][p.k] ? s.cartoons[n][p.k].views : null]),
-      lineStyle: {width: 2}, itemStyle: {color: css(p.c), borderColor: surface, borderWidth: 2}})).concat(
+      ...lineLook(css(p.c), xDash(p))})).concat(
       // posted before tracking began: a dashed line from 0 at posting to the first reading (after the badged lines)
       ps.map(p => { const l = lead(p), f = r.find(s => s.cartoons[n] && s.cartoons[n][p.k]);
         return l.length && f ? {name: p.label, type: "line", silent: true, showSymbol: false, tooltip: {show: false},
-          data: [...l, [f.updated, f.cartoons[n][p.k].views]], lineStyle: {width: 1, type: "dashed", opacity: .5, color: css(p.c)}} : null; })
+          data: [...l, [f.updated, f.cartoons[n][p.k].views]], lineStyle: {width: 1.5, type: "dashed", opacity: .5, color: css(p.c)}} : null; })
         .filter(Boolean)),
     graphic: r.length < 2 ? [{type: "text", left: "center", top: "middle",
       style: {text: "History builds up with each refresh.", fill: css("--text-muted"), fontSize: 13}}] : [],
