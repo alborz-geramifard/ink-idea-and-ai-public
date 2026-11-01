@@ -375,6 +375,10 @@ function renderTiles() {
 function fitCharts() {   // only charts on screen: a hidden one has no width to measure
   Object.values(charts).forEach(c => { if (c.getDom().offsetWidth) c.resize(); });
 }
+// the mouse wheel always scrolls the page, also over a chart with its hover box open (user, 2026-11-01): ECharts'
+// zoom swallows wheel events even with wheel zoom off, so stop them before they reach a chart (the browser still scrolls)
+document.addEventListener("wheel", e => { if (e.target.closest && e.target.closest("[_echarts_instance_]")) e.stopPropagation(); },
+                          {capture: true});
 function chart(id) { return charts[id] || (charts[id] = echarts.init($(id), null, {renderer: "canvas"})); }
 function base() {
   const muted = css("--text-muted"), grid = css("--grid");
