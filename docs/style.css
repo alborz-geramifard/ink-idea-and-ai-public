@@ -23,17 +23,22 @@ h2 { font-size: 20px; margin-top: 32px; }
 header:not(.brand) { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; }
 header:not(.brand) img { width: 72px; height: 72px; border-radius: 50%; border: 2px solid var(--gold); }
 
-/* header: the brand banner (ink to orange) as a full-width cover; the logo and, to its right, the
-   name sit below on plain paper, nothing printed over the art */
-header.brand { display: block; margin: -24px calc(50% - 50vw) 12px; padding: 0 16px 6px; text-align: center; }
-header.brand::before { content: ""; display: block; height: clamp(120px, 21vw, 230px); width: min(1400px, 100vw); margin: 0 auto 0 50%; translate: -50%;
+/* header: the brand banner (ink to orange) at full strength across the top of the page, fading into the paper
+   below; the logo and name sit on a frosted glass card in front of it */
+header.brand { position: relative; isolation: isolate; display: block; margin: -24px calc(50% - 50vw) 24px;
+               padding: clamp(80px, 11vw, 150px) 16px clamp(70px, 9vw, 120px); text-align: center; }
+header.brand::before { content: ""; position: absolute; inset: 0 0 -90px; z-index: -1; pointer-events: none;
                        background: url(banner-wide.jpg?v=2) center / cover no-repeat, #fff;
-                       mix-blend-mode: multiply;   /* soft edges all round, so the art melts into the paper */
-                       --fade: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent), linear-gradient(#000 65%, transparent);
-                       -webkit-mask-image: var(--fade); -webkit-mask-composite: source-in; mask-image: var(--fade); mask-composite: intersect; }
-@media (prefers-color-scheme: dark) { header.brand::before { mix-blend-mode: normal; opacity: .55; filter: invert(1) hue-rotate(180deg); } }
-header.brand .plate { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: -18px; text-align: left; }
-header.brand img { display: block; flex: none; width: 88px; height: 88px; margin: 0; border-radius: 50%;
+                       mix-blend-mode: multiply;   /* the white turns into the paper colour */
+                       -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
+@media (prefers-color-scheme: dark) { header.brand::before { mix-blend-mode: normal; opacity: .5; filter: invert(1) hue-rotate(180deg); } }
+header.brand .plate { position: relative; display: inline-flex; align-items: center; gap: 22px; text-align: left;
+                      padding: 18px 34px 18px 18px; border-radius: 28px;
+                      background: color-mix(in srgb, var(--paper) 72%, transparent);
+                      backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3);
+                      border: 1px solid rgba(255, 255, 255, .6); box-shadow: 0 20px 50px rgba(40, 30, 10, .18); }
+@media (prefers-color-scheme: dark) { header.brand .plate { border-color: rgba(255, 255, 255, .12); box-shadow: 0 20px 50px rgba(0, 0, 0, .4); } }
+header.brand img { display: block; flex: none; width: 104px; height: 104px; margin: 0; border-radius: 50%;
                    border: 4px solid var(--paper); box-shadow: var(--shadow); position: relative; }
 header.brand h1 { font-size: 34px; line-height: 1.1; letter-spacing: -.01em; margin: 0; }
 header.brand p { margin: 6px 0 0; font: 600 11px/1.3 var(--sans); letter-spacing: .18em; text-transform: uppercase; color: var(--gold); }
@@ -151,8 +156,9 @@ a.arrow.right { right: -64px; }
   ul.thumbs { grid-template-columns: repeat(2, 1fr); gap: 12px; }
   .lead { font-size: 20px; }
   header.brand { margin-top: -20px; }
-  header.brand .plate { gap: 12px; margin-top: -10px; }
-  header.brand img { width: 64px; height: 64px; }
+  header.brand { margin-bottom: 16px; }
+  header.brand .plate { gap: 14px; padding: 14px 20px 14px 14px; border-radius: 22px; }
+  header.brand img { width: 72px; height: 72px; }
   header.brand h1 { font-size: 27px; }
   header.brand p { letter-spacing: .1em; }
   ul.pills { gap: 10px; }
