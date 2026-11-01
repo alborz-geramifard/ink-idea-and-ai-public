@@ -47,19 +47,28 @@ const logo = brand => {
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${fg}">${body}</svg>`);
 };
+// the Instagram image post's mark: a small stack of photos, shown after the Instagram logo instead of the word "image"
+const PHOTO = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="#1d1b18" stroke-width="1.4" stroke-linejoin="round">' +
+  '<rect x="1.5" y="2.5" width="16" height="12" rx="2.2" fill="#ef5b7b"/><rect x="3.5" y="5" width="16" height="12" rx="2.2" fill="#ffd25e"/>' +
+  '<rect x="5.5" y="7.5" width="17" height="13" rx="2.2" fill="#dbeefb"/>' +
+  '<path d="M6.2 18.4l5.3-5.2 4.3 4.4 2.1-1.9 4 3.4v.4a1.6 1.6 0 0 1-1.6 1.6H7.6a1.6 1.6 0 0 1-1.4-.8z" fill="#18b4e8"/>' +
+  '<circle cx="18.2" cy="11.4" r="1.7" fill="#ffd25e"/></svg>');
 const byLabel = label => PLAT.find(p => p.label === label) || FOLLOW_P.find(p => p.label === label);
 function richIcons(size = 16) {   // ECharts rich-text styles: {i_tiktok|} draws the TikTok logo
-  const r = {tag: {color: css("--text-secondary"), fontSize: 12, padding: [0, 0, 0, 4]}};
+  const r = {tag: {color: css("--text-secondary"), fontSize: 12, padding: [0, 0, 0, 4]},
+             i_photo: {backgroundColor: {image: PHOTO}, width: size, height: size, padding: [0, 0, 0, 3]}};
   for (const b of Object.keys(GLYPH)) r["i_" + b] = {backgroundColor: {image: logo(b)}, width: size, height: size};
   return r;
 }
-const iconText = label => { const p = byLabel(label); return p ? `{i_${p.brand}|}` + (p.tag ? `{tag|${p.tag}}` : "") : label; };
+const tagText = p => p.tag === "image" ? "{i_photo|}" : p.tag ? `{tag|${p.tag}}` : "";
+const iconText = label => { const p = byLabel(label); return p ? `{i_${p.brand}|}` + tagText(p) : label; };
 // cartoon numbers: white digits on a blue circle (HTML and ECharts rich text)
 const num = (n, cls = "") => `<span class="num${cls ? " " + cls : ""}">${esc(n)}</span>`;
 const numRich = (size = 18) => ({backgroundColor: css("--num"), color: "#fff", borderRadius: size / 2, width: size, height: size,
                                  lineHeight: size, align: "center", fontSize: Math.round(size * .6), fontWeight: "bold"});
 const iconHtml = p => `<img src="${logo(p.brand)}" alt="${esc(p.label)}" title="${esc(p.label)}" class="pl">` +
-  (p.tag ? `<span class="pltag">${p.tag}</span>` : "");
+  (p.tag === "image" ? `<img src="${PHOTO}" alt="image" title="${esc(p.label)}" class="pl pltag-img">` : p.tag ? `<span class="pltag">${p.tag}</span>` : "");
 const FOLLOW = [["tiktok", "TikTok", "--s1"], ["instagram", "Instagram", "--s2"], ["facebook", "Facebook", "--s7"], ["pinterest", "Pinterest", "--s8"], ["linkedin", "LinkedIn", "--s9"], ["x", "X", "--s4"], ["threads", "Threads", "--s5"]];
 const FOLLOW_P = FOLLOW.map(([k, label]) => ({brand: k, label, tag: ""}));
 const ENG = [["likes", "Likes", "👍", "--e1"], ["comments", "Comments", "💬", "--e2"], ["shares", "Shares", "↗", "--e3"],
@@ -77,7 +86,7 @@ const t = s => new Date(s.updated).getTime();
 
 let DATA = null, charts = {}, fails = 0;
 let KEY = null, IV = null, REFRESH = "";   // the unlocked key + which data.json is shown, for live refreshes
-const state = {range: 0, off: new Set(), mode: "total", sort: {key: "total", asc: false}, sel: null, tab: "social"};
+const state = {range: 0, off: new Set(), sort: {key: "total", asc: false}, sel: null, tab: "social"};
 
 // ---- theme --------------------------------------------------------------------------
 try { const th = localStorage.getItem("ink-theme"); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
@@ -177,7 +186,6 @@ function start() {
   $("login").hidden = true;
   $("app").hidden = false;
   $("range").onclick = e => { const b = e.target.closest("button"); if (!b) return; state.range = +b.dataset.r; renderAll(); };
-  $("viewMode").onclick = e => { const b = e.target.closest("button"); if (!b) return; state.mode = b.dataset.m; renderAll(); };
   $("closeDetail").onclick = () => { state.sel = null; renderAll(); };
   $("tab").onclick = e => { const b = e.target.closest("button"); if (!b) return; state.tab = b.dataset.t; renderAll(); };
   addEventListener("resize", fitCharts);
@@ -310,7 +318,7 @@ function renderChanges() {
   const eng = ENG.filter(([k]) => k !== "new_followers").map(([k, l, ic]) => [ic, engAll(now, k) - engAll(base, k)]).filter(([, d]) => d);
   if (eng.length) lines.push(`💬 Engagement: ${eng.map(([ic, d]) => `${ic} <b>${d > 0 ? "+" : ""}${d}</b>`).join(" · ")}`);
   const df = allFollowers(now) - allFollowers(base);
-  if (df) lines.push(`👤 Followers <b>${fmt(allFollowers(base))} → ${fmt(allFollowers(now))}</b>`);
+  if (df) lines.push(`👤 <b>${fmt(allFollowers(base))} → ${fmt(allFollowers(now))}</b>`);
   const fresh = commentList().filter(c => new Date(c.at).getTime() >= t(base));
   if (fresh.length) lines.push(`🗨️ <b>${fresh.length} new comment${fresh.length > 1 ? "s" : ""}</b>: ` +
     fresh.slice(0, 2).map(c => `@${esc(c.user)} on ${num(c.n)} “${esc(c.text.slice(0, 60))}”`).join(" · "));
@@ -331,9 +339,9 @@ function renderTiles() {
   const best = Object.entries(now.cartoons).sort((a, b) => cartoonViews(b[1]) - cartoonViews(a[1]))[0];
   const tiles = [
     ["Views", fmt(allViews(now)), delta(allViews(now), then && allViews(then)) + ` ${when}`],
-    ["Interactions", fmt(allInter(now)), delta(allInter(now), then && allInter(then)) + ` · likes, comments, shares, saves`],
-    ["Followers", fmt(allFollowers(now)), delta(allFollowers(now), then && allFollowers(then)) + " · all platforms"],
-    ["Instagram watch time", reelWatch(now) == null ? "–" : fmt(reelWatch(now), 1) + " s",
+    ["Interactions", fmt(allInter(now)), delta(allInter(now), then && allInter(then)) + " · 👍 💬 ↗ 🔖"],
+    ["👤", fmt(allFollowers(now)), delta(allFollowers(now), then && allFollowers(then)) + " · all platforms"],
+    [`${iconHtml(PLAT.find(p => p.k === "instagram_reel"))} watch time`, reelWatch(now) == null ? "–" : fmt(reelWatch(now), 1) + " s",
      delta(reelWatch(now), then && reelWatch(then), 1) + " · median per video"],
     ["Top cartoon", best ? num(best[0], "lg") : "–", best ? `${esc(best[1].title)} · ${fmt(cartoonViews(best[1]))} views` : ""],
   ];
@@ -352,7 +360,7 @@ function base() {
     animationDuration: 500,
     textStyle: {fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", color: css("--text-secondary")},
     grid: {left: 8, right: 24, top: 36, bottom: 16, containLabel: true},
-    tooltip: {trigger: "axis", backgroundColor: css("--surface-1"), borderColor: css("--border"),
+    tooltip: {trigger: "axis", order: "valueDesc", backgroundColor: css("--surface-1"), borderColor: css("--border"),
               textStyle: {color: css("--text-primary")}, axisPointer: {type: "line", lineStyle: {color: muted}}},
     legend: {top: 0, left: 0, icon: "circle", itemWidth: 10, itemHeight: 10, itemGap: 16, formatter: iconText,
              textStyle: {color: css("--text-secondary"), rich: richIcons()}},
@@ -425,20 +433,17 @@ function withBadges(id, items) {   // draw now and again whenever the visible wi
   ch.on("finished", () => { if (ch.getWidth() !== w) { w = ch.getWidth(); draw(); } });   // after a resize
   draw();
 }
-const platBadge = p => ({text: iconText(p.label), rich: richIcons(16), color: css(p.c), w: 16 + 14 + (p.tag ? p.tag.length * 7 + 4 : 0)});
+const platTip = ps => `<b>${ps[0].axisValueLabel}</b><br>` + ps.filter(x => x.value[1] != null).sort((a, b) => b.value[1] - a.value[1])
+  .map(x => `${byLabel(x.seriesName) ? iconHtml(byLabel(x.seriesName)) : esc(x.seriesName)} <b>${fmt(x.value[1])}</b>`).join("<br>");   // logos, biggest first
+const platBadge = p => ({text: iconText(p.label), rich: richIcons(16), color: css(p.c), w: 16 + 14 + (p.tag === "image" ? 19 : p.tag ? p.tag.length * 7 + 4 : 0)});
 
 function renderTrend() {
-  const r = inRange(), gain = state.mode === "gain", surface = css("--surface-1");
-  document.querySelectorAll("#viewMode button").forEach(b => b.classList.toggle("on", b.dataset.m === state.mode));
+  const r = inRange(), surface = css("--surface-1");
   const series = on().map(p => {
     const pts = r.map(s => [s.updated, totals(s)[p.k]]);
-    const data = gain ? pts.slice(1).map((pt, i) => [pt[0], pt[1] - pts[i][1]]) : pts;
-    return gain
-      ? {name: p.label, type: "bar", stack: "gain", data, barMaxWidth: 28,
-         itemStyle: {color: css(p.c), borderColor: surface, borderWidth: 1}, emphasis: {focus: "series"}}
-      : {name: p.label, type: "line", data, smooth: .25, symbol: "circle", symbolSize: 8, showSymbol: data.length < 30,
-         lineStyle: {width: 2}, itemStyle: {color: css(p.c), borderColor: surface, borderWidth: 2},
-         emphasis: {focus: "series"}};
+    return {name: p.label, type: "line", data: pts, smooth: .25, symbol: "circle", symbolSize: 8, showSymbol: pts.length < 30,
+            lineStyle: {width: 2}, itemStyle: {color: css(p.c), borderColor: surface, borderWidth: 2},
+            emphasis: {focus: "series"}};
   });
   const lo = t(r[0]), hi = t(latest());
   const flags = Object.entries(latest().cartoons).map(([n, c]) => [n, postedAt(c)])
@@ -450,18 +455,65 @@ function renderTrend() {
     data: flags.map(([n, at]) => ({name: n, xAxis: at}))};
   const o = base();
   chart("cTrend").setOption({
-    ...o, series, legend: {...o.legend, show: gain},
+    ...o, series, legend: {...o.legend, show: false},
     grid: {...o.grid, bottom: 52},
-    tooltip: {...o.tooltip, order: "valueDesc", valueFormatter: v => fmt(v)},   // biggest platform first
+    tooltip: {...o.tooltip, formatter: platTip},
     xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
-    dataZoom: [{type: "inside", filterMode: "none"}, {type: "slider", filterMode: "none", height: 20, bottom: 6, borderColor: "transparent",
+    dataZoom: [{type: "inside", filterMode: "none", zoomOnMouseWheel: false, moveOnMouseWheel: false},   // the wheel scrolls the page
+               {type: "slider", filterMode: "none", height: 20, bottom: 6, borderColor: "transparent",
                fillerColor: "rgba(200,137,43,.15)", dataBackground: {lineStyle: {color: css("--text-muted")}, areaStyle: {opacity: 0}},
                handleStyle: {color: css("--accent")}, textStyle: {color: css("--text-muted")}}],
     graphic: r.length < 2 ? [{type: "text", left: "center", top: "middle",
       style: {text: "The trend fills in as refreshes come in (twice a day).", fill: css("--text-muted"), fontSize: 13}}] : [],
   }, true);
-  if (!gain) withBadges("cTrend", on().map(platBadge));
+  withBadges("cTrend", on().map(platBadge));
+}
+
+// views per cartoon by age: each line starts when its cartoon was posted, so old and new cartoons compare fairly
+function renderAge() {
+  const all = snaps(), o = base(), muted = css("--text-muted"), surface = css("--surface-1");
+  const cs = Object.entries(latest().cartoons).filter(([, c]) => postedAt(c)).sort((a, b) => +a[0] - +b[0]);
+  const days = (s, at) => (t(s) - new Date(at).getTime()) / 864e5;
+  const lines = cs.map(([n, c]) => {
+    const at = postedAt(c);
+    return [n, all.map((s, i) => [s, i]).filter(([s]) => s.cartoons[n] && days(s, at) >= 0)
+                  .map(([s, i]) => [days(s, at), cartoonViews(s.cartoons[n]), i])];   // i: the snapshot, for the hover breakdown
+  });
+  const look = {lineStyle: {width: 2, color: muted, opacity: .55}, itemStyle: {color: muted, borderColor: surface, borderWidth: 2},
+                emphasis: {focus: "series", lineStyle: {width: 3, color: css("--num"), opacity: 1}, itemStyle: {color: css("--num")}},
+                blur: {lineStyle: {opacity: .15}}};
+  const series = [
+    ...lines.map(([n, data]) => ({name: n, type: "line", data, smooth: .25, showSymbol: false, symbol: "circle", symbolSize: 8, ...look})),
+    // posted before tracking began: a dashed line from 0 views at posting to the first reading
+    ...lines.filter(([, d]) => d.length && d[0][0] > .1).map(([n, d]) => ({name: n, type: "line", data: [[0, 0], d[0]], silent: true,
+      showSymbol: false, tooltip: {show: false}, ...look, lineStyle: {...look.lineStyle, type: "dashed", width: 1, opacity: .35}}))];
+  const title = n => (latest().cartoons[n] || {}).title || "";
+  const age = d => d < 2 ? `${fmt(d * 24)} h` : `${fmt(d, 1)} days`;
+  const ch = chart("cAge");
+  let mouseY = 0;   // the hover box describes the line nearest the pointer
+  ch.getZr().off("mousemove"); ch.getZr().on("mousemove", e => { mouseY = e.offsetY; });
+  const hover = ps => {
+    const near = ps.filter(x => x.seriesIndex < lines.length).map(x => [x, Math.abs(ch.convertToPixel({seriesIndex: x.seriesIndex}, x.value)[1] - mouseY)])
+      .sort((a, b) => a[1] - b[1])[0];
+    if (!near) return "";
+    const [x] = near, n = x.seriesName, c = all[x.value[2]].cartoons[n];
+    const rows = on().map(p => [p, views(c, p.k)]).filter(([, v]) => v).sort((a, b) => b[1] - a[1]);
+    return `<b>${num(n)} ${esc(title(n))}</b> · ${age(x.value[0])} after posting<br>` +
+      rows.map(([p, v]) => `${iconHtml(p)} <b>${fmt(v)}</b>`).join("<br>") +
+      `<br>Total: <b>${fmt(x.value[1])}</b>`;
+  };
+  ch.setOption({
+    ...o, legend: {show: false},
+    tooltip: {...o.tooltip, formatter: hover},
+    xAxis: {...o.xAxis, type: "value", min: 0, minInterval: 1,
+            axisLabel: {...o.xAxis.axisLabel, formatter: v => v ? `day ${v}` : "posted"}},
+    yAxis: {...o.yAxis, type: "value", minInterval: 1},
+    series,
+    graphic: series.length ? [] : [{type: "text", left: "center", top: "middle",
+      style: {text: "No posted cartoons yet.", fill: muted, fontSize: 13}}],
+  }, true);
+  withBadges("cAge", cs.map(([n]) => ({text: `{num|${n}}`, rich: {num: numRich(16)}, w: 22})));   // the dashed lead-ins get none
 }
 
 function renderMix() {
@@ -469,7 +521,7 @@ function renderMix() {
   const o = base();
   chart("cMix").setOption({
     ...o, legend: {show: false}, grid: {...o.grid, top: 8, right: 70},
-    tooltip: {...o.tooltip, trigger: "item", formatter: d => `${d.name}: <b>${fmt(d.value)}</b> views (${fmt(d.value / all * 100)}%)`},
+    tooltip: {...o.tooltip, trigger: "item", formatter: d => `${iconHtml(byLabel(d.name))} <b>${fmt(d.value)}</b> (${fmt(d.value / all * 100)}%)`},
     xAxis: {...o.xAxis, type: "value", splitLine: {lineStyle: {color: css("--grid")}}},
     yAxis: {...o.yAxis, type: "category", data: ps.map(p => p.label), splitLine: {show: false},
             axisLabel: {color: css("--text-secondary"), formatter: iconText, rich: richIcons(18)}},
@@ -483,11 +535,12 @@ function renderEngTrend() {
   const r = inRange(), o = base(), surface = css("--surface-1");
   chart("cEngTrend").setOption({
     ...o, legend: {show: false},
-    tooltip: {...o.tooltip, order: "valueDesc", valueFormatter: v => fmt(v)},   // biggest first
+    tooltip: {...o.tooltip, formatter: ps => `<b>${ps[0].axisValueLabel}</b><br>` +   // icon then number, no gap
+      ps.slice().sort((a, b) => b.value[1] - a.value[1]).map(x => `${x.marker}${x.seriesName} <b>${fmt(x.value[1])}</b>`).join("<br>")},
     xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
     series: ENG.map(([k, l, ic, c]) => ({
-      name: k === "new_followers" ? `${ic} Followers` : `${ic} ${l}`, type: "line", step: "end", symbol: "circle", symbolSize: 8, showSymbol: r.length < 30,
+      name: ic, type: "line", step: "end", symbol: "circle", symbolSize: 8, showSymbol: r.length < 30,
       data: r.map(s => [s.updated, k === "new_followers" ? allFollowers(s) : engAll(s, k)]),
       lineStyle: {width: 2}, itemStyle: {color: css(c), borderColor: surface, borderWidth: 2}, emphasis: {focus: "series"}})),
   }, true);
@@ -503,21 +556,21 @@ function renderEngPosts() {
     ...o, legend: {...o.legend, formatter: n => n}, grid: {...o.grid, top: 60},
     tooltip: {...o.tooltip, trigger: "item",   // the views bar shows views; the stack shows its engagement
               formatter: p => { const [n, c] = cs[p.dataIndex], head = `<b>${num(n)} ${esc(c.title)}</b><br>`;
-                return head + (p.seriesName === "👁 Views" ? `${p.marker}Views: <b>${fmt(p.value)}</b>`
-                  : ENG.map(([k, l, ic, col]) => `<span style="color:${css(col)}">●</span> ${ic} ${l}: <b>${fmt(eng(c, k))}</b>`).join("<br>")); }},
+                return head + (p.seriesName === "👁" ? `👁 <b>${fmt(p.value)}</b>`
+                  : ENG.map(([k, , ic]) => [ic, eng(c, k)]).sort((a, b) => b[1] - a[1]).map(([ic, v]) => `${ic} <b>${fmt(v)}</b>`).join("<br>")); }},
     xAxis: {...o.xAxis, type: "category", data: cs.map(([n]) => `{num|${n}}`),   // numbers only; the title is in the tooltip
             axisLabel: {...o.xAxis.axisLabel, interval: 0, fontSize: 11, rich: {num: numRich(16)}}},
-    yAxis: [{...o.yAxis, type: "value", minInterval: 1, name: "Engagement", nameTextStyle: {color: css("--text-muted"), align: "left"}},
-            {...o.yAxis, type: "value", minInterval: 1, position: "right", splitLine: {show: false}, name: "Views",   // total views on the right
+    yAxis: [{...o.yAxis, type: "value", minInterval: 1, name: "👍 💬 ↗ 🔖 👤", nameTextStyle: {color: css("--text-muted"), align: "left"}},
+            {...o.yAxis, type: "value", minInterval: 1, position: "right", splitLine: {show: false}, name: "👁",   // total views on the right
              nameTextStyle: {color: css("--text-muted"), align: "right"}}],
     series: [...ENG.map(([k, l, ic, c], i) => ({
-      name: `${ic} ${l}`, type: "bar", stack: "eng", barMaxWidth: 34, data: cs.map(([, cc]) => eng(cc, k)),
+      name: ic, type: "bar", stack: "eng", barMaxWidth: 34, data: cs.map(([, cc]) => eng(cc, k)),
       itemStyle: {color: css(c), borderColor: surface, borderWidth: 1,
                   borderRadius: i === ENG.length - 1 ? [4, 4, 0, 0] : 0}, emphasis: {focus: "series"}})),
-      {name: "👁 Views", type: "bar", yAxisIndex: 1, barMaxWidth: 34, barGap: "15%", data: cs.map(([, cc]) => cartoonViews(cc)),   // beside the stack
+      {name: "👁", type: "bar", yAxisIndex: 1, barMaxWidth: 34, barGap: "15%", data: cs.map(([, cc]) => cartoonViews(cc)),   // beside the stack
        itemStyle: {color: css("--text-muted"), opacity: 0.55, borderRadius: [4, 4, 0, 0]}, emphasis: {focus: "series"}}],
     graphic: any ? [] : [{type: "text", left: "center", top: "middle",
-      style: {text: "No likes, comments, shares or saves yet on the selected platforms.", fill: css("--text-muted"), fontSize: 13}}],
+      style: {text: "No 👍 💬 ↗ 🔖 yet on the selected platforms.", fill: css("--text-muted"), fontSize: 13}}],
   }, true);
 }
 
@@ -613,7 +666,7 @@ function renderDetail() {
   const ps = on().filter(p => c[p.k]);
   chart("cDetail").setOption({
     ...o, legend: {show: false},
-    tooltip: {...o.tooltip, valueFormatter: v => fmt(v)},
+    tooltip: {...o.tooltip, formatter: platTip},
     xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
     series: ps.map(p => ({
@@ -650,7 +703,7 @@ function renderAll() {
   $("socialView").hidden = web; $("webView").hidden = !web;
   fitCharts();   // charts sized while their tab was hidden come back squeezed (ECharts falls back to 100 px)
   if (web) { renderWeb(); return; }
-  renderChanges(); renderTiles(); renderTrend(); renderEngTrend(); renderEngPosts(); renderMix(); renderBoard(); renderDetail(); renderComments();
+  renderChanges(); renderTiles(); renderTrend(); renderAge(); renderEngTrend(); renderEngPosts(); renderMix(); renderBoard(); renderDetail(); renderComments();
   preloadBig();
 }
 
