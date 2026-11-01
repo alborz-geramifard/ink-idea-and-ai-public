@@ -730,14 +730,62 @@ function pageName(path) {   // "/ink-idea-and-ai-public/cartoons/3-free-trial/" 
   if (/\/(ink-idea-and-ai-public\/?)?$/.test(path || "/")) return "Homepage";
   return esc(path.replace("/ink-idea-and-ai-public", "") || "/");
 }
-const FLAG = cc => cc && cc.length === 2 ? String.fromCodePoint(...[...cc.toUpperCase()].map(ch => 127397 + ch.charCodeAt(0))) + " " + cc : "Unknown";
-function webTable(id, rows, label, name, share = true) {
-  const list = Object.entries(webSum(webCut(rows))).sort((a, b) => b[1].views - a[1].views);
-  const total = list.reduce((a, [, o]) => a + o.views, 0) || 1;
-  $(id).innerHTML = `<thead><tr><th>${label}</th><th>Views</th>${share ? "<th>Share</th>" : ""}<th>Visitors</th><th>Avg time</th></tr></thead><tbody>` +
-    (list.length ? list.map(([k, o]) => `<tr><td>${id === "webPages" && k ? `<a href="${esc(k)}" target="_blank" rel="noopener">${name(k)}</a>` : name(k)}</td><td>${fmt(o.views)}</td>${share ? `<td>${fmt(o.views / total * 100)}%</td>` : ""}` +
-      `<td>${fmt(o.visitors)}</td><td>${secs(avgTime(o))}</td></tr>`).join("") : `<tr><td colspan="${share ? 5 : 4}" class="muted">No visits in this range.</td></tr>`) +
-    "</tbody>";
+// Website breakdowns as bar charts (biggest on top); the hover box has views, share, visitors and time on page.
+const SOURCES = [[/linkedin/, "LinkedIn"], [/facebook|^fb\./, "Facebook"], [/instagram/, "Instagram"], [/threads/, "Threads"],
+                 [/^t\.co$|twitter|^x\.com/, "X"], [/pinterest/, "Pinterest"], [/tiktok/, "TikTok"], [/youtube/, "YouTube"],
+                 [/google/, "Google"], [/bing|duckduckgo|yahoo/, "Search"], [/chatgpt|openai|claude|perplexity/, "AI chat"]];
+const sourceName = k => !k ? "Direct / unknown" : (SOURCES.find(([re]) => re.test(k)) || [null, k])[1];   // LinkedIn app + site = LinkedIn
+const REGION = (() => { try { return new Intl.DisplayNames(undefined, {type: "region"}); } catch (e) { return null; } })();
+const countryName = cc => cc && cc.length === 2
+  ? `${String.fromCodePoint(...[...cc.toUpperCase()].map(ch => 127397 + ch.charCodeAt(0)))} ${REGION ? REGION.of(cc.toUpperCase()) : cc}` : "Unknown";
+const deviceName = k => k ? k[0].toUpperCase() + k.slice(1) : "Unknown";
+function pageLabel(path) {   // plain text for chart axes: "3 · Free Trial", "Homepage"
+  const m = /cartoons\/(\d+)-[^/]*\/?$/.exec(path || "");
+  if (m) { const c = latest().cartoons[m[1]]; return `${m[1]} · ${c ? c.title : ""}`; }
+  if (/\/(ink-idea-and-ai-public\/?)?$/.test(path || "/")) return "Homepage";
+  return (path || "/").replace("/ink-idea-and-ai-public", "") || "/";
+}
+function webTip(name, o, total) {
+  return `<b>${esc(name)}</b><br>👁 <b>${fmt(o.views)}</b> views · ${fmt(o.views / total * 100)}%<br>` +
+         `👤 <b>${fmt(o.visitors)}</b> visitors<br>⏱ <b>${secs(avgTime(o))}</b> on the page`;
+}
+function webBars(id, rows, nameOf, color, max = 12) {
+  const keyOf = {}, sum = webSum(webCut(rows), r => { const n = nameOf(r.k); keyOf[n] = r.k; return n; });
+  const list = Object.entries(sum).sort((a, b) => b[1].views - a[1].views);
+  const total = list.reduce((a, [, o]) => a + o.views, 0) || 1, shown = list.slice(0, max).reverse();   // biggest on top
+  const o = base(), muted = css("--text-muted");
+  $(id).style.height = `${Math.max(140, shown.length * 30 + 36)}px`;
+  const ch = chart(id);
+  ch.resize();
+  ch.setOption({
+    ...o, legend: {show: false}, grid: {...o.grid, top: 4, right: 44, bottom: 4},
+    tooltip: {...o.tooltip, trigger: "item", formatter: p => webTip(p.name, sum[p.name], total)},
+    xAxis: {type: "value", show: false},
+    yAxis: {type: "category", data: shown.map(([k]) => k), axisLine: {show: false}, axisTick: {show: false},
+            axisLabel: {color: css("--text-secondary"), width: 150, overflow: "truncate", fontSize: 12}},
+    series: [{type: "bar", data: shown.map(([, v]) => v.views), barMaxWidth: 18, cursor: id === "webPages" ? "pointer" : "default",
+              itemStyle: {color: css(color), borderRadius: [0, 4, 4, 0]},
+              label: {show: true, position: "right", color: muted, formatter: p => fmt(p.value)}}],
+    graphic: shown.length ? [] : [{type: "text", left: "center", top: "middle", style: {text: "No visits in this range.", fill: muted, fontSize: 13}}],
+  }, true);
+  ch.off("click");
+  if (id === "webPages") ch.on("click", p => { const k = keyOf[p.name]; if (k) open(k, "_blank", "noopener"); });
+}
+function webDonut(id, rows, nameOf) {
+  const sum = webSum(webCut(rows), r => nameOf(r.k)), list = Object.entries(sum).sort((a, b) => b[1].views - a[1].views);
+  const total = list.reduce((a, [, o]) => a + o.views, 0) || 1, {xAxis, yAxis, ...o} = base();   // a pie has no axes
+  $(id).style.height = "220px";
+  const ch = chart(id);
+  ch.resize();
+  ch.setOption({
+    ...o, legend: {show: false},
+    tooltip: {...o.tooltip, trigger: "item", formatter: p => webTip(p.name, sum[p.name], total)},
+    color: ["--s1", "--s4", "--s6", "--s8"].map(css),
+    series: [{type: "pie", radius: ["48%", "75%"], avoidLabelOverlap: true, itemStyle: {borderColor: css("--surface-1"), borderWidth: 2},
+              label: {color: css("--text-secondary"), formatter: p => `${p.name}\n${fmt(p.percent)}%`},
+              data: list.map(([k, v]) => ({name: k, value: v.views}))}],
+    graphic: list.length ? [] : [{type: "text", left: "center", top: "middle", style: {text: "No visits in this range.", fill: css("--text-muted"), fontSize: 13}}],
+  }, true);
 }
 function renderWeb() {
   const W = DATA.web;
@@ -753,23 +801,19 @@ function renderWeb() {
     ["Top cartoon page", top ? pageName(top[0]) : "–", top ? `${fmt(top[1].views)} views · ${secs(avgTime(top[1]))}` : ""],
   ];
   $("webTiles").innerHTML = tiles.map(([k, v, d]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join("");
-  const o = base(), byDay = days.map(r => r.day);
-  const at = d => d + "T12:00:00Z", surface = css("--surface-1");
-  const line = (name, c, key) => ({name, type: "line", smooth: .25, symbol: "circle", symbolSize: 8, showSymbol: days.length < 30,
-    data: days.map(r => [at(r.day), r[key]]), lineStyle: {width: 2}, itemStyle: {color: css(c), borderColor: surface, borderWidth: 2},
-    emphasis: {focus: "series"}});
-  chart("cWeb").setOption({   // the same look as Views over time: smooth lines named by badges, no legend
-    ...o, legend: {show: false},
-    tooltip: {...o.tooltip, valueFormatter: v => fmt(v)},
-    xAxis: {...o.xAxis, type: "time", ...(days.length > 2 ? {minInterval: 864e5} : {}),
-            axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
+  const o = base(), dayLabel = d => new Date(d + "T12:00:00Z").toLocaleDateString([], {month: "short", day: "numeric"});
+  const bar = (name, c, key) => ({name, type: "bar", barMaxWidth: 26, barGap: "15%", data: days.map(r => r[key]),
+    itemStyle: {color: css(c), borderRadius: [4, 4, 0, 0]}, emphasis: {focus: "series"}});
+  chart("cWeb").setOption({   // one pair of bars per day: page views and visitors
+    ...o, legend: {...o.legend, formatter: n => n},
+    tooltip: {...o.tooltip, axisPointer: {type: "shadow"}, valueFormatter: v => fmt(v)},
+    xAxis: {...o.xAxis, type: "category", data: days.map(r => dayLabel(r.day))},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
-    series: [line("Page views", "--s4", "views"), line("Visitors", "--s1", "visitors")],
+    series: [bar("👁 Page views", "--s4", "views"), bar("👤 Visitors", "--s1", "visitors")],
   }, true);
-  withBadges("cWeb", [{text: "👁 Page views", color: css("--s4"), w: 96}, {text: "👤 Visitors", color: css("--s1"), w: 80}]);
-  webTable("webPages", W.path, "Page", pageName);
-  webTable("webRefs", W.ref, "Source", k => k ? esc(k) : "Direct / unknown", false);
-  webTable("webCountries", W.country, "Country", FLAG, false);
-  webTable("webDevices", W.device, "Device", k => esc(k ? k[0].toUpperCase() + k.slice(1) : "Unknown"), false);
+  webBars("webPages", W.path, pageLabel, "--s4", 15);
+  webBars("webRefs", W.ref, sourceName, "--s1");
+  webBars("webCountries", W.country, countryName, "--s6");
+  webDonut("webDevices", W.device, deviceName);
   chart("cWeb").resize();
 }
