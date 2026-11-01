@@ -92,8 +92,9 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, ch => ({"&": "&amp;", "<": 
 const fmt = (n, d = 0) => {
   if (n == null) return "–";
   const v = Number(n), a = Math.abs(v);
-  if (a < 1000) return v.toLocaleString(undefined, {maximumFractionDigits: d, minimumFractionDigits: d});
-  const short = (x, unit) => { const r = Math.round(x * 10) / 10; return (Math.abs(r) < 10 ? r.toFixed(1) : String(Math.round(x))) + unit; };
+  // a decimal that comes out as .0 is dropped (user, 2026-11-01): 6 s, 0%, 1K, 2M
+  if (a < 1000) return v.toLocaleString(undefined, {maximumFractionDigits: d, minimumFractionDigits: 0});
+  const short = (x, unit) => { const r = Math.round(x * 10) / 10; return (Math.abs(r) < 10 ? r.toFixed(1).replace(/\.0$/, "") : String(Math.round(x))) + unit; };
   const m = v / 1e6;
   if (a >= 1e6 || Math.round(Math.abs(v / 1e3)) >= 1000) return short(m, "M");
   return short(v / 1e3, "K");
@@ -352,21 +353,11 @@ function delta(now, then, d = 0) {
   if (Math.abs(x) < 10 ** -d / 2) return `<span class="muted">no change</span>`;
   return `<span class="${x > 0 ? "up" : "down"}">${x > 0 ? "▲ +" : "▼ −"}${fmt(Math.abs(x), d)}</span>`;
 }
-// "since your last visit" (user, 2026-11-01): this browser remembers when you last looked. A new visit starts after
-// VISIT_GAP_MS away; reloads and the 10-minute refreshes within one visit keep comparing to the same moment.
-const VISIT = "ink-last-visit", VISIT_GAP_MS = 30 * 60 * 1000;
-const visitBase = (() => {
-  try {
-    const now = Date.now(), v = JSON.parse(localStorage.getItem(VISIT) || "null");
-    const next = !v ? {base: null, at: now} : now - v.at > VISIT_GAP_MS ? {base: v.at, at: now} : {base: v.base, at: now};
-    localStorage.setItem(VISIT, JSON.stringify(next));
-    return next.base;
-  } catch (e) { return null; }
-})();
 function renderTiles() {
-  const now = latest(), past = visitBase ? snaps().filter(s => t(s) <= visitBase) : [];
-  const then = past.length ? past[past.length - 1] : null;
-  const when = visitBase ? `since your visit ${ago(new Date(visitBase).toISOString())}` : "";
+  // change since the same time yesterday (user, 2026-11-01): the last reading at or before 24 h ago
+  const now = latest(), past = snaps().filter(s => t(s) <= t(now) - 864e5);
+  const then = past.length ? past[past.length - 1] : snaps()[0];
+  const when = "since yesterday";
   const best = Object.entries(now.cartoons).sort((a, b) => cartoonViews(b[1]) - cartoonViews(a[1]))[0];
   const tiles = [
     ["Views", fmt(allViews(now)), delta(allViews(now), then && allViews(then)) + ` ${when}`],
@@ -376,7 +367,6 @@ function renderTiles() {
      delta(reelWatch(now), then && reelWatch(then), 1) + ` ${when}`],
     ["Top cartoon", best ? num(best[0], "lg") : "–", best ? `${esc(best[1].title)} · ${fmt(cartoonViews(best[1]))} views` : ""],
   ];
-  if (!then) tiles.slice(0, 4).forEach(x => { x[2] = `<span class="muted">changes since your last visit show from your next visit</span>`; });
   $("tiles").innerHTML = tiles.map(([k, v, d]) =>
     `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join("");
 }
@@ -446,8 +436,11 @@ function lineBadges(ch, items) {
     }
     spots.forEach(([[x, y], coord]) => {
       if (x < rect.x || x > rect.x + rect.width || y < rect.y - 1 || y > rect.y + rect.height + 1) return;   // zoomed out of view
-      for (const dir of [-1, 1]) {
-        const cy = y + dir * (BADGE_H / 2 + BADGE_GAP), box = [x - it.w / 2, cy - BADGE_H / 2, x + it.w / 2, cy + BADGE_H / 2];
+      // above, below, left or right of the point (user, 2026-11-01): beside a steep stretch the line stays clear
+      for (const dir of ["top", "bottom", "left", "right"]) {
+        const cx = x + (dir === "left" ? -1 : dir === "right" ? 1 : 0) * (it.w / 2 + BADGE_GAP);
+        const cy = y + (dir === "top" ? -1 : dir === "bottom" ? 1 : 0) * (BADGE_H / 2 + BADGE_GAP);
+        const box = [cx - it.w / 2, cy - BADGE_H / 2, cx + it.w / 2, cy + BADGE_H / 2];
         if (box[0] < rect.x || box[2] > rect.x + rect.width || box[1] < rect.y - 26 || box[3] > rect.y + rect.height) continue;   // the empty top margin is fair game
         const near = Math.min(Infinity, ...placed.map(b => boxGap(box, b)));
         let score = Math.min(60, near, ...px.map((p, k) => k === i ? Infinity : clear(p, box))) + x / rect.width;   // ties: newer end
@@ -460,8 +453,9 @@ function lineBadges(ch, items) {
     placed.push(best.box);
     if (it.group) done.add(it.group);
     return {silent: true, animation: false, symbol: "circle", symbolSize: 1, itemStyle: {color: "transparent"},
-      data: [{coord: best.coord, label: {show: true, position: best.dir < 0 ? "top" : "bottom", distance: BADGE_GAP,
+      data: [{coord: best.coord, label: {show: true, position: best.dir, distance: BADGE_GAP,
         formatter: it.text, rich: it.rich, fontSize: it.fontSize || 12, color: css("--text-secondary"), backgroundColor: surface,
+        ...(it.ring ? {borderColor: it.color, borderWidth: 2} : {}),   // a ring in the line's colour (pale emoji like 🔖 vanish otherwise)
         borderRadius: BADGE_H / 2, padding: [3, 7], height: BADGE_H - 8, lineHeight: BADGE_H - 8}}]};
   });
   ch.setOption({series: marks.map(markPoint => ({markPoint}))});
