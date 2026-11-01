@@ -399,13 +399,21 @@ function lineBadges(ch, items) {
   const boxGap = (a, b) => Math.max(a[0] - b[2], b[0] - a[2], a[1] - b[3], b[1] - a[3]);
   const placed = opt.series.flatMap(s => ((s.markLine && s.markLine.data) || []).filter(d => d.xAxis != null)
     .map(d => { const x = ch.convertToPixel({xAxisIndex: 0}, d.xAxis); return [x - 12, rect.y - 26, x + 12, rect.y]; }));   // the flags' number circles
+  const done = new Set();   // items sharing a group (a line and its dashed lead-in) get one badge between them
   const marks = opt.series.map((s, i) => {
     const it = items[i];
-    if (!it || !px[i].length) return {data: []};
+    if (!it || !px[i].length || (it.group && done.has(it.group))) return {data: []};
     let best = null;
     const pts = s.data.filter(d => d[1] != null);
-    px[i].forEach(([x, y], j) => {
-      if (x < rect.x || x > rect.x + rect.width) return;   // zoomed out of view
+    // where a badge may go: the data points, plus points along the line every 24 px, so a line still gets its
+    // badge when zoomed in between two readings
+    const spots = px[i].map((p, j) => [p, pts[j]]);
+    for (let x = rect.x + 12; x < rect.x + rect.width - 12; x += 24) {
+      const y = yAt(px[i], x);
+      if (y != null && y >= rect.y && y <= rect.y + rect.height) spots.push([[x, y], ch.convertFromPixel({seriesIndex: i}, [x, y])]);
+    }
+    spots.forEach(([[x, y], coord]) => {
+      if (x < rect.x || x > rect.x + rect.width || y < rect.y - 1 || y > rect.y + rect.height + 1) return;   // zoomed out of view
       for (const dir of [-1, 1]) {
         const cy = y + dir * (BADGE_H / 2 + BADGE_GAP), box = [x - it.w / 2, cy - BADGE_H / 2, x + it.w / 2, cy + BADGE_H / 2];
         if (box[0] < rect.x || box[2] > rect.x + rect.width || box[1] < rect.y - 26 || box[3] > rect.y + rect.height) continue;   // the empty top margin is fair game
@@ -413,11 +421,12 @@ function lineBadges(ch, items) {
         let score = Math.min(60, near, ...px.map((p, k) => k === i ? Infinity : clear(p, box))) + x / rect.width;   // ties: newer end
         if (clear(px[i], box) < 0) score -= 1000;   // its own line crossing it: only when nothing else fits
         if (near < 0) score -= 2000;                // covering another badge: worse still
-        if (!best || score > best.score) best = {score, box, coord: pts[j], dir};
+        if (!best || score > best.score) best = {score, box, coord, dir};
       }
     });
     if (!best) return {data: []};
     placed.push(best.box);
+    if (it.group) done.add(it.group);
     return {silent: true, animation: false, symbol: "circle", symbolSize: 1, itemStyle: {color: "transparent"},
       data: [{coord: best.coord, label: {show: true, position: best.dir < 0 ? "top" : "bottom", distance: BADGE_GAP,
         formatter: it.text, rich: it.rich, color: css("--text-secondary"), backgroundColor: surface,
@@ -565,7 +574,9 @@ function renderAge() {
     graphic: series.length ? [] : [{type: "text", left: "center", top: "middle",
       style: {text: "No posted cartoons yet.", fill: muted, fontSize: 13}}],
   }, true);
-  withBadges("cAge", cs.map(([n]) => ({text: `{num|${n}}`, rich: {num: numRich(16)}, w: 22})));   // the dashed lead-ins get none
+  const badge = n => ({text: `{num|${n}}`, rich: {num: numRich(16)}, w: 22, group: n});
+  withBadges("cAge", [...lines.map(([n]) => badge(n)),   // the dashed lead-ins badge their cartoon only when its solid line is out of view
+                      ...lines.filter(([, d]) => d.length && d[0][0] > .1).map(([n]) => badge(n))]);
 }
 
 function renderMix() {
@@ -605,16 +616,16 @@ function renderEngPosts() {
         o = base(), surface = css("--surface-1");
   const any = cs.some(([, c]) => ENG.some(([k]) => eng(c, k)));
   chart("cEngPosts").setOption({
-    ...o, legend: {...o.legend, formatter: n => n}, grid: {...o.grid, top: 60},
+    ...o, legend: {show: false}, grid: {...o.grid, top: 16},   // no legend: the hover box names each part
     tooltip: {...o.tooltip, trigger: "item",   // the views bar shows views; the stack shows its engagement
               formatter: p => { const [n, c] = cs[p.dataIndex], head = `<b>${num(n)} ${esc(c.title)}</b><br>`;
                 return head + (p.seriesName === "👁" ? `👁 <b>${fmt(p.value)}</b>`
-                  : ENG.map(([k, , ic]) => [ic, eng(c, k)]).sort((a, b) => b[1] - a[1]).map(([ic, v]) => `${ic} <b>${fmt(v)}</b>`).join("<br>")); }},
+                  : ENG.map(([k, , ic, col]) => [ic, eng(c, k), col]).sort((a, b) => b[1] - a[1])   // the hovered part in its bar colour
+                      .map(([ic, v, col]) => ic === p.seriesName ? `<span style="background:${css(col)};color:#fff;font-weight:700;border-radius:4px;padding:1px 6px;margin-left:-6px">${ic} ${fmt(v)}</span>` : `${ic} <b>${fmt(v)}</b>`).join("<br>")); }},
     xAxis: {...o.xAxis, type: "category", data: cs.map(([n]) => `{num|${n}}`),   // numbers only; the title is in the tooltip
             axisLabel: {...o.xAxis.axisLabel, interval: 0, fontSize: 11, rich: {num: numRich(16)}}},
-    yAxis: [{...o.yAxis, type: "value", minInterval: 1, name: "👍 💬 ↗ 🔖 👤", nameTextStyle: {color: css("--text-muted"), align: "left"}},
-            {...o.yAxis, type: "value", minInterval: 1, position: "right", splitLine: {show: false}, name: "👁",   // total views on the right
-             nameTextStyle: {color: css("--text-muted"), align: "right"}}],
+    yAxis: [{...o.yAxis, type: "value", minInterval: 1},
+            {...o.yAxis, type: "value", minInterval: 1, position: "right", splitLine: {show: false}}],   // total views on the right
     series: [...ENG.map(([k, l, ic, c], i) => ({
       name: ic, type: "bar", stack: "eng", barMaxWidth: 34, data: cs.map(([, cc]) => eng(cc, k)),
       itemStyle: {color: css(c), borderColor: surface, borderWidth: 1,
