@@ -76,6 +76,7 @@ const b64 = s => Uint8Array.from(atob(s), ch => ch.charCodeAt(0));
 const t = s => new Date(s.updated).getTime();
 
 let DATA = null, charts = {}, fails = 0;
+let KEY = null, IV = null, REFRESH = "";   // the unlocked key + which data.json is shown, for live refreshes
 const state = {range: 0, off: new Set(), mode: "total", sort: {key: "total", asc: false}, sel: null, tab: "social"};
 
 // ---- theme --------------------------------------------------------------------------
@@ -118,6 +119,7 @@ function saved() {
     if (blob.salt !== s.salt) throw new Error("password changed");
     const key = await crypto.subtle.importKey("raw", b64(s.k), {name: "AES-GCM"}, false, ["decrypt"]);
     DATA = await decrypt(key, blob);
+    KEY = key; IV = blob.iv;
     start();
   } catch (e) {
     try { localStorage.removeItem(SESSION); } catch (e2) {}
@@ -144,6 +146,7 @@ $("loginForm").addEventListener("submit", async e => {
     key = await crypto.subtle.deriveKey({name: "PBKDF2", hash: "SHA-256", salt: b64(blob.salt), iterations: blob.iter},
                                         base, {name: "AES-GCM", length: 256}, true, ["decrypt"]);
     DATA = await decrypt(key, blob);
+    KEY = key; IV = blob.iv;
   } catch (err) {
     fails++;
     const wait = Math.min(60, 2 ** fails);   // each wrong guess waits longer
@@ -178,7 +181,39 @@ function start() {
   $("closeDetail").onclick = () => { state.sel = null; renderAll(); };
   $("tab").onclick = e => { const b = e.target.closest("button"); if (!b) return; state.tab = b.dataset.t; renderAll(); };
   addEventListener("resize", () => Object.values(charts).forEach(c => c.resize()));
+  $("refresh").onclick = () => askFresh();
   renderAll();
+  askFresh();
+}
+
+// ---- live refresh -------------------------------------------------------------------
+// Opening the page asks the website Worker for fresh numbers; the Mac sees the request within 30 s
+// (stats.py --if-asked), collects every platform except X and publishes a new data.json. We poll for it.
+const REFRESH_URL = "https://ink-analytics.inkideaandai.workers.dev/refresh";
+let asking = false;
+async function askFresh() {
+  if (asking) return;   // one request at a time (page load or the ↻ button)
+  asking = true; $("refresh").classList.add("spin");
+  try { await askFreshOnce(); } finally { asking = false; $("refresh").classList.remove("spin"); }
+}
+async function askFreshOnce() {
+  try { await fetch(REFRESH_URL, {method: "POST"}); } catch (e) { return; }   // Worker unreachable: keep what we have
+  REFRESH = "refreshing…"; renderAll();
+  const until = Date.now() + 5 * 60 * 1000;
+  while (Date.now() < until) {
+    await new Promise(r => setTimeout(r, 15000));
+    if (!DATA) return;   // signed out meanwhile
+    try {
+      const blob = await loadBlob();
+      if (blob.iv !== IV) {
+        DATA = await decrypt(KEY, blob); IV = blob.iv;
+        REFRESH = "just refreshed"; renderAll();
+        setTimeout(() => { if (REFRESH === "just refreshed") { REFRESH = ""; renderAll(); } }, 60000);
+        return;
+      }
+    } catch (e) {}
+  }
+  REFRESH = "no fresh numbers (is the Mac asleep?)"; renderAll();
 }
 
 // ---- data helpers -------------------------------------------------------------------
@@ -467,8 +502,8 @@ function renderEngPosts() {
               formatter: p => { const [n, c] = cs[p.dataIndex], head = `<b>${num(n)} ${esc(c.title)}</b><br>`;
                 return head + (p.seriesName === "👁 Views" ? `${p.marker}Views: <b>${fmt(p.value)}</b>`
                   : ENG.map(([k, l, ic, col]) => `<span style="color:${css(col)}">●</span> ${ic} ${l}: <b>${fmt(eng(c, k))}</b>`).join("<br>")); }},
-    xAxis: {...o.xAxis, type: "category", data: cs.map(([n, c]) => `{num|${n}}\n${c.title}`),
-            axisLabel: {...o.xAxis.axisLabel, interval: 0, fontSize: 11, lineHeight: 16, rich: {num: numRich(16)}}},
+    xAxis: {...o.xAxis, type: "category", data: cs.map(([n]) => `{num|${n}}`),   // numbers only; the title is in the tooltip
+            axisLabel: {...o.xAxis.axisLabel, interval: 0, fontSize: 11, rich: {num: numRich(16)}}},
     yAxis: [{...o.yAxis, type: "value", minInterval: 1, name: "Engagement", nameTextStyle: {color: css("--text-muted"), align: "left"}},
             {...o.yAxis, type: "value", minInterval: 1, position: "right", splitLine: {show: false}, name: "Views",   // total views on the right
              nameTextStyle: {color: css("--text-muted"), align: "right"}}],
@@ -606,7 +641,7 @@ function renderAll() {
   const now = latest(), errs = Object.keys(now.errors || {});
   $("updated").textContent = `Updated ${new Date(now.updated).toLocaleString([], {dateStyle: "medium", timeStyle: "short"})}` +
     ` · ${snaps().length} snapshot${snaps().length === 1 ? "" : "s"} since ${new Date(snaps()[0].updated).toLocaleDateString([], {month: "short", day: "numeric"})}` +
-    (errs.length ? ` · couldn't refresh: ${errs.join(", ")}` : "");
+    (errs.length ? ` · couldn't refresh: ${errs.join(", ")}` : "") + (REFRESH ? ` · ${REFRESH}` : "");
   const web = state.tab === "web";
   document.querySelectorAll("#tab button").forEach(b => b.classList.toggle("on", b.dataset.t === state.tab));
   $("socialView").hidden = web; $("webView").hidden = !web;
