@@ -66,11 +66,14 @@ ul.pills a:hover, ul.pills a:focus-visible { transform: translateY(-2px); border
              box-shadow: 0 2px 4px rgba(40, 30, 10, .08), 0 10px 24px rgba(40, 30, 10, .10); }
 ul.pills svg.icon { width: 24px; height: 24px; flex: none; }
 
-/* follow: round icon-only buttons */
+/* follow / channel links: bare icons, quiet grey until hovered, then their own colours */
 ul.pills.icons { gap: 14px; }
 ul.pills.icons li { flex: 0 0 auto; }
-ul.pills.icons a { width: 56px; height: 56px; padding: 0; justify-content: center; }
-ul.pills.icons svg.icon { width: 26px; height: 26px; }
+ul.pills.icons a { width: 56px; height: 56px; padding: 0; justify-content: center; background: none; border: 0; box-shadow: none;
+                   border-radius: 50%; }
+ul.pills.icons a:hover, ul.pills.icons a:focus-visible { box-shadow: none; transform: translateY(-2px) scale(1.12); }
+ul.pills.icons svg.icon { width: 26px; height: 26px; filter: grayscale(1); opacity: .6; transition: filter .2s ease, opacity .2s ease; }
+ul.pills.icons a:hover svg.icon, ul.pills.icons a:focus-visible svg.icon { filter: none; opacity: 1; }
 
 /* the publishing tool: a quiet card */
 section.note { margin-top: 28px; }
@@ -201,3 +204,8 @@ nav.topbar ul.links a:hover, nav.topbar ul.links a:focus-visible, nav.topbar ul.
 .share-menu .copy .check, .share-menu .copy.done svg:not(.check) { display: none; }
 .share-menu .copy.done .check { display: block; color: #2e8b57; }
 @media (max-width: 520px) { .share { top: 8px; right: 8px; } }
+main:not(.cartoon) > ul.pills.icons { margin-top: 40px; }   /* the homepage follow icons, no heading above */
+/* the share row too: grey icons, their own colours on hover */
+.share-menu a svg { filter: grayscale(1); opacity: .65; transition: filter .2s ease, opacity .2s ease, transform .15s ease; }
+.share-menu a:hover, .share-menu a:focus-visible { background: none; }
+.share-menu a:hover svg, .share-menu a:focus-visible svg { filter: none; opacity: 1; transform: scale(1.15); }
