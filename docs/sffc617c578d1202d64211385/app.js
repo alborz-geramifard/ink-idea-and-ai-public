@@ -452,7 +452,7 @@ function renderTrend() {
   chart("cTrend").setOption({
     ...o, series, legend: {...o.legend, show: gain},
     grid: {...o.grid, bottom: 52},
-    tooltip: {...o.tooltip, valueFormatter: v => fmt(v)},
+    tooltip: {...o.tooltip, order: "valueDesc", valueFormatter: v => fmt(v)},   // biggest platform first
     xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
     dataZoom: [{type: "inside", filterMode: "none"}, {type: "slider", filterMode: "none", height: 20, bottom: 6, borderColor: "transparent",
@@ -487,7 +487,7 @@ function renderEngTrend() {
     xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
     series: ENG.map(([k, l, ic, c]) => ({
-      name: k === "new_followers" ? `${ic} Followers (all platforms)` : `${ic} ${l}`, type: "line", step: "end", symbol: "circle", symbolSize: 8, showSymbol: r.length < 30,
+      name: k === "new_followers" ? `${ic} Followers` : `${ic} ${l}`, type: "line", step: "end", symbol: "circle", symbolSize: 8, showSymbol: r.length < 30,
       data: r.map(s => [s.updated, k === "new_followers" ? allFollowers(s) : engAll(s, k)]),
       lineStyle: {width: 2}, itemStyle: {color: css(c), borderColor: surface, borderWidth: 2}, emphasis: {focus: "series"}})),
   }, true);
