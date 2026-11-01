@@ -27,6 +27,12 @@ header.brand { position: sticky; top: 0; z-index: 10; display: flex; align-items
                 margin: -24px calc(50% - 50vw) 8px; padding: 10px 16px;   /* full width, pinned to the top */
                 background: color-mix(in srgb, var(--paper) 90%, transparent); backdrop-filter: blur(8px);
                 -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+/* the brand banner (ink to orange) behind the header, faded so the name stays readable */
+header.brand { isolation: isolate; padding-top: 16px; padding-bottom: 16px; }
+header.brand::before { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(ellipse 300px 60% at 50% 50%, var(--paper) 35%, transparent 95%),   /* clear patch behind the text */
+                                   url(banner-wide.jpg?v=2) center / min(760px, 100%) auto no-repeat;
+                       opacity: .6; mix-blend-mode: multiply; pointer-events: none; }
+@media (prefers-color-scheme: dark) { header.brand::before { opacity: .22; mix-blend-mode: normal; filter: invert(1) hue-rotate(180deg); } }
 header.brand img { display: block; width: 64px; height: 64px; flex: none; border-radius: 50%; box-shadow: var(--shadow); }
 header.brand h1 { font-size: 26px; line-height: 1.1; letter-spacing: -.01em; margin: 0; }
 header.brand p { margin: 4px 0 0; font: 600 11px/1.3 var(--sans); letter-spacing: .18em; text-transform: uppercase; color: var(--gold); }
