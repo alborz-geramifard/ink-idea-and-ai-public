@@ -491,24 +491,54 @@ function renderAge() {
   const title = n => (latest().cartoons[n] || {}).title || "";
   const age = d => d < 2 ? `${fmt(d * 24)} h` : `${fmt(d, 1)} days`;
   const ch = chart("cAge");
-  let mouseY = 0;   // the hover box describes the line nearest the pointer
-  ch.getZr().off("mousemove"); ch.getZr().on("mousemove", e => { mouseY = e.offsetY; });
+  let mouseY = 0;   // the hover box describes the line under the pointer, and any line running close to it
+  // swap only our own listeners: a bare off("mousemove") also removes the one ECharts drags the zoom handles with
+  const zr = ch.getZr(), mine = ch.__ageHandlers || {};
+  if (mine.move) zr.off("mousemove", mine.move);
+  if (mine.out) zr.off("globalout", mine.out);
+  const CLOSE_PX = 16;   // lines this close to the nearest one (in pixels) are listed too
+  let lit = [];
+  ch.__ageHandlers = {move: e => { mouseY = e.offsetY; }, out: () => { lit = []; ch.dispatchAction({type: "downplay"}); }};
+  zr.on("mousemove", ch.__ageHandlers.move);
+  zr.on("globalout", ch.__ageHandlers.out);
+  const at = (d, x) => {   // the line's views at day x (straight between readings), null outside it
+    if (!d.length || x < d[0][0] || x > d[d.length - 1][0]) return null;
+    const j = d.findIndex(p => p[0] >= x);
+    if (j <= 0) return d[0][1];
+    const [a, b] = [d[j - 1], d[j]];
+    return a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]);
+  };
   const hover = ps => {
-    const near = ps.filter(x => x.seriesIndex < lines.length).map(x => [x, Math.abs(ch.convertToPixel({seriesIndex: x.seriesIndex}, x.value)[1] - mouseY)])
-      .sort((a, b) => a[1] - b[1])[0];
-    if (!near) return "";
-    const [x] = near, n = x.seriesName, c = all[x.value[2]].cartoons[n];
-    const rows = on().map(p => [p, views(c, p.k)]).filter(([, v]) => v).sort((a, b) => b[1] - a[1]);
-    return `<b>${num(n)} ${esc(title(n))}</b> · ${age(x.value[0])} after posting<br>` +
-      rows.map(([p, v]) => `${iconHtml(p)} <b>${fmt(v)}</b>`).join("<br>") +
-      `<br>Total: <b>${fmt(x.value[1])}</b>`;
+    const x = ps.length ? ps[0].axisValue : null;
+    if (x == null) return "";
+    const near = lines.map(([n, d]) => { const v = at(d, x); return v == null ? null : {n, d, px: ch.convertToPixel({xAxisIndex: 0, yAxisIndex: 0}, [x, v])[1]}; })
+      .filter(Boolean).map(l => ({...l, gap: Math.abs(l.px - mouseY)})).sort((a, b) => a.gap - b.gap);
+    if (!near.length) return "";
+    const shown = near.filter(l => Math.abs(l.px - near[0].px) <= CLOSE_PX);
+    const idx = shown.map(l => lines.findIndex(([n]) => n === l.n));
+    lit = idx;   // light up exactly the lines in the box, after ECharts' own pick (the nearest reading) has been drawn
+    setTimeout(() => { if (lit === idx) { ch.dispatchAction({type: "downplay"}); ch.dispatchAction({type: "highlight", seriesIndex: idx}); } });
+    return shown.map(({n, d}) => {
+      const p = d.reduce((best, q) => Math.abs(q[0] - x) < Math.abs(best[0] - x) ? q : best);   // the reading nearest the pointer
+      const c = all[p[2]].cartoons[n];
+      const rows = on().map(pl => [pl, views(c, pl.k)]).filter(([, v]) => v).sort((a, b) => b[1] - a[1]);
+      return `<b>${num(n)} ${esc(title(n))}</b> · ${age(p[0])} after posting<br>` +
+        (shown.length > 1   // several lines: one row of numbers each, so the box stays short
+          ? rows.map(([pl, v]) => `${iconHtml(pl)} <b>${fmt(v)}</b>`).join("&nbsp;&nbsp;") + `<br>Total: <b>${fmt(p[1])}</b>`
+          : rows.map(([pl, v]) => `${iconHtml(pl)} <b>${fmt(v)}</b>`).join("<br>") + `<br>Total: <b>${fmt(p[1])}</b>`);
+    }).join(`<hr style="border:0;border-top:1px solid ${css("--border")};margin:6px 0">`);
   };
   ch.setOption({
     ...o, legend: {show: false},
+    grid: {...o.grid, bottom: 52},
     tooltip: {...o.tooltip, formatter: hover},
     xAxis: {...o.xAxis, type: "value", min: 0, minInterval: 1,
-            axisLabel: {...o.xAxis.axisLabel, formatter: v => v ? `day ${v}` : "posted"}},
+            axisLabel: {...o.xAxis.axisLabel, formatter: v => v ? `day ${Number.isInteger(v) ? v : fmt(v, 1)}` : "posted"}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
+    dataZoom: [{type: "inside", filterMode: "none", zoomOnMouseWheel: false, moveOnMouseWheel: false},   // as on Views over time
+               {type: "slider", filterMode: "none", height: 20, bottom: 6, borderColor: "transparent",
+               fillerColor: "rgba(200,137,43,.15)", dataBackground: {lineStyle: {color: css("--text-muted")}, areaStyle: {opacity: 0}},
+               handleStyle: {color: css("--accent")}, textStyle: {color: css("--text-muted")}, labelFormatter: v => age(v)}],
     series,
     graphic: series.length ? [] : [{type: "text", left: "center", top: "middle",
       style: {text: "No posted cartoons yet.", fill: muted, fontSize: 13}}],
