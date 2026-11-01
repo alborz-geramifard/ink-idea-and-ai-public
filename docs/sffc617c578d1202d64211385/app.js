@@ -511,14 +511,19 @@ function renderAge() {
     return [n, all.map((s, i) => [s, i]).filter(([s]) => s.cartoons[n] && days(s, at) >= 0)
                   .map(([s, i]) => [days(s, at), cartoonViews(s.cartoons[n]), i])];   // i: the snapshot, for the hover breakdown
   });
-  const look = {lineStyle: {width: 2, color: muted, opacity: .55}, itemStyle: {color: muted, borderColor: surface, borderWidth: 2},
-                emphasis: {focus: "series", lineStyle: {width: 3, color: css("--num"), opacity: 1}, itemStyle: {color: css("--num")}},
-                blur: {lineStyle: {opacity: .15}}};
+  // each cartoon its own hue (golden-angle steps, so neighbours differ), faint until hovered, then it glows in that hue
+  const dark = document.documentElement.dataset.theme
+    ? document.documentElement.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  const hue = n => `hsl(${(+n * 137.5) % 360}, ${dark ? 70 : 62}%, ${dark ? 62 : 45}%)`;
+  const look = n => ({lineStyle: {width: 2, color: hue(n), opacity: .35}, itemStyle: {color: hue(n), borderColor: surface, borderWidth: 2},
+                emphasis: {focus: "series", lineStyle: {width: 3.5, color: hue(n), opacity: 1, shadowColor: hue(n), shadowBlur: 14},
+                           itemStyle: {color: hue(n), shadowColor: hue(n), shadowBlur: 10}},
+                blur: {lineStyle: {opacity: .12}}});
   const series = [
-    ...lines.map(([n, data]) => ({name: n, type: "line", data, smooth: .25, showSymbol: false, symbol: "circle", symbolSize: 8, ...look})),
+    ...lines.map(([n, data]) => ({name: n, type: "line", data, smooth: .25, showSymbol: false, symbol: "circle", symbolSize: 8, ...look(n)})),
     // posted before tracking began: a dashed line from 0 views at posting to the first reading
     ...lines.filter(([, d]) => d.length && d[0][0] > .1).map(([n, d]) => ({name: n, type: "line", data: [[0, 0], d[0]], silent: true,
-      showSymbol: false, tooltip: {show: false}, ...look, lineStyle: {...look.lineStyle, type: "dashed", width: 1, opacity: .35}}))];
+      showSymbol: false, tooltip: {show: false}, ...look(n), lineStyle: {...look(n).lineStyle, type: "dashed", width: 1, opacity: .25}}))];
   const title = n => (latest().cartoons[n] || {}).title || "";
   const age = d => d < 2 ? `${fmt(d * 24)} h` : `${fmt(d, 1)} days`;
   const ch = chart("cAge");
@@ -574,7 +579,7 @@ function renderAge() {
     graphic: series.length ? [] : [{type: "text", left: "center", top: "middle",
       style: {text: "No posted cartoons yet.", fill: muted, fontSize: 13}}],
   }, true);
-  const badge = n => ({text: `{num|${n}}`, rich: {num: numRich(16)}, w: 22, group: n});
+  const badge = n => ({text: `{num|${n}}`, rich: {num: numRich(22)}, w: 28, group: n});
   withBadges("cAge", [...lines.map(([n]) => badge(n)),   // the dashed lead-ins badge their cartoon only when its solid line is out of view
                       ...lines.filter(([, d]) => d.length && d[0][0] > .1).map(([n]) => badge(n))]);
 }
