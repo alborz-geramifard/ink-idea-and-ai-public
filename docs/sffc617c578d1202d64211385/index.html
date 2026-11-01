@@ -7,7 +7,7 @@
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://ink-analytics.inkideaandai.workers.dev; font-src 'self'; base-uri 'none'; form-action 'none'">
 <title>Ink Stats</title>
-<link rel="stylesheet" href="dash.css?v=20">
+<link rel="stylesheet" href="dash.css?v=21">
 </head>
 <body>
 <!-- Sign in: the page holds no data; data.json is AES-256-GCM, key = PBKDF2(username + password) -->
@@ -50,17 +50,22 @@
 
   <section class="grid">
     <article class="card wide">
-      <div class="card-h"><h2>Views over time</h2><div class="seg small" id="viewMode"><button data-m="total" class="on">Cumulative</button><button data-m="gain">Gained per refresh</button></div></div>
+      <div class="card-h"><h2>Views over time</h2></div>
       <div class="chart" id="cTrend"></div>
     </article>
 
     <article class="card wide">
-      <div class="card-h"><h2>Engagement over time</h2><span class="note">likes, comments, shares, saves (all posts) and total followers</span></div>
+      <div class="card-h"><h2>Views since posting</h2><span class="note">each cartoon from the moment it was posted; dashed = before tracking began (Oct 27); hover a line to pick it out</span></div>
+      <div class="chart" id="cAge"></div>
+    </article>
+
+    <article class="card wide">
+      <div class="card-h"><h2>Engagement over time</h2><span class="note">👍 💬 ↗ 🔖 (all posts) and 👤 total</span></div>
       <div class="chart short" id="cEngTrend"></div>
     </article>
 
     <article class="card wide">
-      <div class="card-h"><h2>Performance per Cartoon</h2><span class="note">most engaged first; gray bar = total views (right axis); 👤 = new followers from that video (TikTok Studio)</span></div>
+      <div class="card-h"><h2>Performance per Cartoon</h2><span class="note">most engaged first; gray bar = 👁 total (right axis); 👤 = gained from that video (TikTok Studio)</span></div>
       <div class="chart short" id="cEngPosts"></div>
     </article>
 
@@ -112,6 +117,6 @@
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
-<script src="app.js?v=54"></script>
+<script src="app.js?v=56"></script>
 </body>
 </html>
