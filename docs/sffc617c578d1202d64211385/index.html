@@ -7,7 +7,7 @@
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://ink-analytics.inkideaandai.workers.dev; font-src 'self'; base-uri 'none'; form-action 'none'">
 <title>Ink Stats</title>
-<link rel="stylesheet" href="dash.css?v=21">
+<link rel="stylesheet" href="dash.css?v=24">
 </head>
 <body>
 <!-- Sign in: the page holds no data; data.json is AES-256-GCM, key = PBKDF2(username + password) -->
@@ -55,7 +55,7 @@
     </article>
 
     <article class="card wide">
-      <div class="card-h"><h2>Views since posting</h2><span class="note">each cartoon from the moment it was posted; dashed = before tracking began (Oct 27); hover a line to pick it out</span></div>
+      <div class="card-h"><h2>Views since posting</h2><span class="note"><svg class="dash-key" width="26" height="8" viewBox="0 0 26 8" aria-label="dashed line"><line x1="1" y1="4" x2="25" y2="4" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3" stroke-linecap="round"/></svg> tracking not available</span></div>
       <div class="chart" id="cAge"></div>
     </article>
 
@@ -117,6 +117,6 @@
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
-<script src="app.js?v=62"></script>
+<script src="app.js?v=63"></script>
 </body>
 </html>
