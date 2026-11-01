@@ -180,7 +180,7 @@ function start() {
   $("viewMode").onclick = e => { const b = e.target.closest("button"); if (!b) return; state.mode = b.dataset.m; renderAll(); };
   $("closeDetail").onclick = () => { state.sel = null; renderAll(); };
   $("tab").onclick = e => { const b = e.target.closest("button"); if (!b) return; state.tab = b.dataset.t; renderAll(); };
-  addEventListener("resize", () => Object.values(charts).forEach(c => c.resize()));
+  addEventListener("resize", fitCharts);
   $("refresh").onclick = () => askFresh();
   renderAll();
   askFresh();
@@ -342,6 +342,9 @@ function renderTiles() {
 }
 
 // ---- charts -------------------------------------------------------------------------
+function fitCharts() {   // only charts on screen: a hidden one has no width to measure
+  Object.values(charts).forEach(c => { if (c.getDom().offsetWidth) c.resize(); });
+}
 function chart(id) { return charts[id] || (charts[id] = echarts.init($(id), null, {renderer: "canvas"})); }
 function base() {
   const muted = css("--text-muted"), grid = css("--grid");
@@ -645,6 +648,7 @@ function renderAll() {
   const web = state.tab === "web";
   document.querySelectorAll("#tab button").forEach(b => b.classList.toggle("on", b.dataset.t === state.tab));
   $("socialView").hidden = web; $("webView").hidden = !web;
+  fitCharts();   // charts sized while their tab was hidden come back squeezed (ECharts falls back to 100 px)
   if (web) { renderWeb(); return; }
   renderChanges(); renderTiles(); renderTrend(); renderEngTrend(); renderEngPosts(); renderMix(); renderBoard(); renderDetail(); renderComments();
   preloadBig();
