@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://ink-analytics.inkideaandai.workers.dev; font-src 'self'; base-uri 'none'; form-action 'none'">
 <title>Ink Stats</title>
-<link rel="stylesheet" href="dash.css?v=19">
+<link rel="stylesheet" href="dash.css?v=20">
 </head>
 <body>
 <!-- Sign in: the page holds no data; data.json is AES-256-GCM, key = PBKDF2(username + password) -->
@@ -34,6 +34,7 @@
         <button data-r="1">24 h</button><button data-r="7">7 d</button><button data-r="30">30 d</button><button data-r="0" class="on">All</button>
       </div>
       <a class="icon sitelink" href="../" target="_blank" rel="noopener" title="Open the website">Website ↗</a>
+      <button class="icon" id="refresh" title="Get fresh numbers now (all platforms except X)" aria-label="Refresh stats">↻</button>
       <button class="icon" id="theme" title="Light / dark" aria-label="Toggle light or dark">◐</button>
       <button class="icon" id="lock" title="Sign out" aria-label="Sign out">⏻</button>
     </div>
@@ -59,7 +60,7 @@
     </article>
 
     <article class="card wide">
-      <div class="card-h"><h2>Engagement per cartoon</h2><span class="note">most engaged first; gray bar = total views (right axis); 👤 = new followers from that video (TikTok Studio)</span></div>
+      <div class="card-h"><h2>Performance per Cartoon</h2><span class="note">most engaged first; gray bar = total views (right axis); 👤 = new followers from that video (TikTok Studio)</span></div>
       <div class="chart short" id="cEngPosts"></div>
     </article>
 
@@ -107,10 +108,10 @@
     <p class="muted empty" id="webEmpty" hidden>No website visits recorded yet. The counter starts once it is set up and the site is published.</p>
   </div>
 
-  <footer class="muted">Refreshed every 30 minutes (X every 3 h, Threads daily) · data encrypted end to end · stays signed in for 1 day on this browser</footer>
+  <footer class="muted">Refreshed every 10 minutes and whenever this page opens (X every 3 h) · data encrypted end to end · stays signed in for 1 day on this browser</footer>
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
-<script src="app.js?v=49"></script>
+<script src="app.js?v=50"></script>
 </body>
 </html>
