@@ -425,10 +425,32 @@ function lineBadges(ch, items) {
   });
   ch.setOption({series: marks.map(markPoint => ({markPoint}))});
 }
+// zoomed in: the y axis tops out just above the highest point still in view, so low lines spread apart
+// (zoomed all the way out: back to ECharts' own scale)
+function fitY(ch) {
+  const z = ch.getOption().dataZoom, x = ch.getModel().getComponent("xAxis", 0).axis.scale.getExtent();
+  if (!z || !z.length || (z[0].start <= 0 && z[0].end >= 100)) { ch.setOption({yAxis: {max: null}}); return; }
+  const num = v => typeof v === "number" ? v : new Date(v).getTime();
+  let top = 0;
+  ch.getOption().series.forEach(s => {
+    if (s.type !== "line") return;
+    const d = s.data.filter(p => p && p[1] != null).map(p => [num(p[0]), p[1]]);
+    d.forEach(([px, py], j) => {
+      if (px >= x[0] && px <= x[1]) top = Math.max(top, py);
+      const q = d[j + 1];   // a segment crossing a window edge counts at the edge
+      if (q) for (const e of x) if (px < e && q[0] > e) top = Math.max(top, py + (q[1] - py) * (e - px) / (q[0] - px));
+    });
+  });
+  if (!top) { ch.setOption({yAxis: {max: null}}); return; }
+  const room = top * 1.18;   // headroom above the top line, so its number badge sits inside the chart
+  const mag = 10 ** Math.floor(Math.log10(room));
+  const step = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find(s => s * mag >= room);
+  ch.setOption({yAxis: {max: step * mag}});
+}
 function withBadges(id, items) {   // draw now and again whenever the visible window changes
   const ch = chart(id), draw = () => lineBadges(ch, items);
   ch.off("datazoom"); ch.off("finished");
-  ch.on("datazoom", () => setTimeout(draw));
+  ch.on("datazoom", () => setTimeout(() => { fitY(ch); draw(); }));
   let w = ch.getWidth();
   ch.on("finished", () => { if (ch.getWidth() !== w) { w = ch.getWidth(); draw(); } });   // after a resize
   draw();
