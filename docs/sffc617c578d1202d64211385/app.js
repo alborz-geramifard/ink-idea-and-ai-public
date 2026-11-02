@@ -139,7 +139,18 @@ function saved() {
   return null;
 }
 
+// local tests (user, 2026-11-01): on this Mac's own server the page opens without a login, from the plain
+// local-data.json that `stats.py --local-dashboard` writes. That file is git-ignored and never published.
+const LOCAL = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+
 (async function resume() {   // still signed in from earlier today? unlock without asking
+  if (LOCAL) {
+    try {
+      const r = await fetch("local-data.json?t=" + Date.now(), {cache: "no-store"});
+      if (r.ok) { DATA = await r.json(); start(); return; }
+    } catch (e) {}
+    $("loginMsg").textContent = "Local test: run python3 Scripts/stats.py --local-dashboard to open without a login.";
+  }
   const s = saved();
   if (!s) return;
   try {
@@ -224,6 +235,7 @@ async function askFresh() {
   try { await askFreshOnce(); } finally { asking = false; $("refresh").classList.remove("spin"); }
 }
 async function askFreshOnce() {
+  if (LOCAL) return;   // the local page shows the history on disk; refreshes belong to the live dashboard
   try { await fetch(REFRESH_URL, {method: "POST"}); } catch (e) { return; }   // Worker unreachable: keep what we have
   REFRESH = "refreshing…"; renderAll();
   const until = Date.now() + 5 * 60 * 1000;
@@ -498,6 +510,12 @@ const platTip = ps => `<b>${ps[0].axisValueLabel}</b><br>` + ps.filter(x => x.va
   .map(x => `${byLabel(x.seriesName) ? iconHtml(byLabel(x.seriesName)) : esc(x.seriesName)} <b>${fmt(x.value[1])}</b>`).join("<br>");   // logos, biggest first
 const platBadge = p => ({text: iconText(p.label), rich: richIcons(21), color: css(p.c), w: 21 + 14 + (p.tag === "image" ? 24 : p.tag ? p.tag.length * 7 + 4 : 0)});
 
+// zoom for the time charts: drag inside to pan, slider below to pick the window (the wheel scrolls the page)
+const timeZoom = () => [{type: "inside", filterMode: "none", zoomOnMouseWheel: false, moveOnMouseWheel: false},
+  {type: "slider", filterMode: "none", height: 20, bottom: 6, borderColor: "transparent",
+   fillerColor: "rgba(200,137,43,.15)", dataBackground: {lineStyle: {color: css("--text-muted")}, areaStyle: {opacity: 0}},
+   handleStyle: {color: css("--accent")}, textStyle: {color: css("--text-muted")}}];
+
 function renderTrend() {
   const r = inRange(), surface = css("--surface-1");
   const series = on().map(p => {
@@ -520,10 +538,7 @@ function renderTrend() {
     tooltip: {...o.tooltip, formatter: platTip},
     xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
-    dataZoom: [{type: "inside", filterMode: "none", zoomOnMouseWheel: false, moveOnMouseWheel: false},   // the wheel scrolls the page
-               {type: "slider", filterMode: "none", height: 20, bottom: 6, borderColor: "transparent",
-               fillerColor: "rgba(200,137,43,.15)", dataBackground: {lineStyle: {color: css("--text-muted")}, areaStyle: {opacity: 0}},
-               handleStyle: {color: css("--accent")}, textStyle: {color: css("--text-muted")}}],
+    dataZoom: timeZoom(),
     graphic: r.length < 2 ? [{type: "text", left: "center", top: "middle",
       style: {text: "The trend fills in as refreshes come in (twice a day).", fill: css("--text-muted"), fontSize: 13}}] : [],
   }, true);
@@ -553,12 +568,11 @@ function renderAge() {
   const title = n => (latest().cartoons[n] || {}).title || "";
   const age = d => d < 2 ? `${fmt(d * 24)} h` : `${fmt(d, 1)} days`;
   const ch = chart("cAge");
-  let mouseY = 0;   // the hover box describes the line under the pointer, and any line running close to it
+  let mouseY = 0;   // the hover box describes only the line nearest the pointer (user, 2026-11-01: one box, not a stack)
   // swap only our own listeners: a bare off("mousemove") also removes the one ECharts drags the zoom handles with
   const zr = ch.getZr(), mine = ch.__ageHandlers || {};
   if (mine.move) zr.off("mousemove", mine.move);
   if (mine.out) zr.off("globalout", mine.out);
-  const CLOSE_PX = 16;   // lines this close to the nearest one (in pixels) are listed too
   let lit = [];
   ch.__ageHandlers = {move: e => { mouseY = e.offsetY; }, out: () => { lit = []; ch.dispatchAction({type: "downplay"}); }};
   zr.on("mousemove", ch.__ageHandlers.move);
@@ -576,7 +590,7 @@ function renderAge() {
     const near = lines.map(([n, d]) => { const v = at(d, x); return v == null ? null : {n, d, px: ch.convertToPixel({xAxisIndex: 0, yAxisIndex: 0}, [x, v])[1]}; })
       .filter(Boolean).map(l => ({...l, gap: Math.abs(l.px - mouseY)})).sort((a, b) => a.gap - b.gap);
     if (!near.length) return "";
-    const shown = near.filter(l => Math.abs(l.px - near[0].px) <= CLOSE_PX);
+    const shown = [near[0]];
     const idx = shown.map(l => lines.findIndex(([n]) => n === l.n));
     lit = idx;   // light up exactly the lines in the box, after ECharts' own pick (the nearest reading) has been drawn
     setTimeout(() => { if (lit === idx) { ch.dispatchAction({type: "downplay"}); ch.dispatchAction({type: "highlight", seriesIndex: idx}); } });
@@ -586,10 +600,8 @@ function renderAge() {
       const rows = on().map(pl => [pl, views(c, pl.k)]).filter(([, v]) => v).sort((a, b) => b[1] - a[1]);
       return `<b>${num(n)} ${esc(title(n))}</b> · ${age(p[0])} after posting<br>` +
         `Total: <b>${fmt(p[1])}</b><br>` +   // the total first (user, 2026-11-01), then each platform
-        (shown.length > 1   // several lines: one row of numbers each, so the box stays short
-          ? rows.map(([pl, v]) => `${iconHtml(pl)} <b>${fmt(v)}</b>`).join("&nbsp;&nbsp;")
-          : rows.map(([pl, v]) => `${iconHtml(pl)} <b>${fmt(v)}</b>`).join("<br>"));
-    }).join(`<hr style="border:0;border-top:1px solid ${css("--border")};margin:6px 0">`);
+        rows.map(([pl, v]) => `${iconHtml(pl)} <b>${fmt(v)}</b>`).join("<br>");
+    }).join("");
   };
   ch.setOption({
     ...o, legend: {show: false},
@@ -630,6 +642,8 @@ function renderEngTrend() {
   const r = inRange(), o = base(), surface = css("--surface-1");
   chart("cEngTrend").setOption({
     ...o, legend: {show: false},
+    grid: {...o.grid, bottom: 52},   // room for the zoom slider, as on Views over time
+    dataZoom: timeZoom(),
     tooltip: {...o.tooltip, formatter: ps => `<b>${ps[0].axisValueLabel}</b><br>` +   // icon then number, no gap
       ps.slice().sort((a, b) => b.value[1] - a.value[1]).map(x => `${x.marker}${x.seriesName} <b>${fmt(x.value[1])}</b>`).join("<br>")},
     xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
