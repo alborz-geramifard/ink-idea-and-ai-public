@@ -857,8 +857,9 @@ const SOURCES = [[/linkedin/, "LinkedIn"], [/facebook|^fb\./, "Facebook"], [/ins
                  [/google/, "Google"], [/bing|duckduckgo|yahoo/, "Search"], [/chatgpt|openai|claude|perplexity/, "AI chat"]];
 const sourceName = k => !k ? "Direct / unknown" : (SOURCES.find(([re]) => re.test(k)) || [null, k])[1];   // LinkedIn app + site = LinkedIn
 const REGION = (() => { try { return new Intl.DisplayNames(undefined, {type: "region"}); } catch (e) { return null; } })();
+// the name, then its flag (user, 2026-11-02: "country name on the left side of the flag")
 const countryName = cc => cc && cc.length === 2
-  ? `${String.fromCodePoint(...[...cc.toUpperCase()].map(ch => 127397 + ch.charCodeAt(0)))} ${REGION ? REGION.of(cc.toUpperCase()) : cc}` : "Unknown";
+  ? `${REGION ? REGION.of(cc.toUpperCase()) : cc.toUpperCase()} ${String.fromCodePoint(...[...cc.toUpperCase()].map(ch => 127397 + ch.charCodeAt(0)))}` : "Unknown";
 const deviceName = k => k ? k[0].toUpperCase() + k.slice(1) : "Unknown";
 function pageLabel(path) {   // plain text for chart axes: "3 · Free Trial", "Homepage"
   const m = /cartoons\/(\d+)-[^/]*\/?$/.exec(path || "");
@@ -870,27 +871,35 @@ function webTip(name, o, total) {
   return `<b>${esc(name)}</b><br>👁 <b>${fmt(o.views)}</b> views · ${fmt(o.views / total * 100)}%<br>` +
          `👤 <b>${fmt(o.visitors)}</b> visitors<br>⏱ <b>${secs(avgTime(o))}</b> on the page`;
 }
+// pages, sources and countries as HTML rows, not a canvas chart (user, 2026-11-02: mobile friendly): the name on the
+// left (full size emoji flags, truncated with … only when it must), then the bar and the number. A row's details
+// (visitors, time on page, share) show on hover as a tooltip and on tap below the row, so phones get them too.
 function webBars(id, rows, nameOf, color, max = 12) {
   const keyOf = {}, sum = webSum(webCut(rows), r => { const n = nameOf(r.k); keyOf[n] = r.k; return n; });
-  const list = Object.entries(sum).sort((a, b) => b[1].views - a[1].views);
-  const total = list.reduce((a, [, o]) => a + o.views, 0) || 1, shown = list.slice(0, max).reverse();   // biggest on top
-  const o = base(), muted = css("--text-muted");
-  $(id).style.height = `${Math.max(140, shown.length * 30 + 36)}px`;
-  const ch = chart(id);
-  ch.resize();
-  ch.setOption({
-    ...o, legend: {show: false}, grid: {...o.grid, top: 4, right: 44, bottom: 4},
-    tooltip: {...o.tooltip, trigger: "item", formatter: p => webTip(p.name, sum[p.name], total)},
-    xAxis: {type: "value", show: false},
-    yAxis: {type: "category", data: shown.map(([k]) => k), axisLine: {show: false}, axisTick: {show: false},
-            axisLabel: {color: css("--text-secondary"), width: 150, overflow: "truncate", fontSize: 12}},
-    series: [{type: "bar", data: shown.map(([, v]) => v.views), barMaxWidth: 18, cursor: id === "webPages" ? "pointer" : "default",
-              itemStyle: {color: css(color), borderRadius: [0, 4, 4, 0]},
-              label: {show: true, position: "right", color: muted, formatter: p => fmt(p.value)}}],
-    graphic: shown.length ? [] : [{type: "text", left: "center", top: "middle", style: {text: "No visits in this range.", fill: muted, fontSize: 13}}],
-  }, true);
-  ch.off("click");
-  if (id === "webPages") ch.on("click", p => { const k = keyOf[p.name]; if (k) open(k, "_blank", "noopener"); });
+  const list = Object.entries(sum).sort((a, b) => b[1].views - a[1].views).slice(0, max);   // biggest first
+  const total = Object.values(sum).reduce((a, o) => a + o.views, 0) || 1, top = list.length ? list[0][1].views || 1 : 1;
+  if (charts[id]) { charts[id].dispose(); delete charts[id]; }   // was an ECharts chart before 2026-11-02
+  const el = $(id);
+  el.style.height = "";
+  el.style.setProperty("--bar", css(color));
+  if (!list.length) { el.innerHTML = `<li class="hb-empty">No visits in this range.</li>`; return; }
+  const link = id === "webPages";
+  el.innerHTML = list.map(([name, o]) => {
+    const more = `👤 ${fmt(o.visitors)} visitor${o.visitors === 1 ? "" : "s"} · ⏱ ${secs(avgTime(o))} on the page · ${fmt(o.views / total * 100)}% of views`;
+    const label = link && keyOf[name] && /^\//.test(keyOf[name])
+      ? `<a href="${esc("https://alborz-geramifard.com" + keyOf[name])}" target="_blank" rel="noopener">${pageName(keyOf[name])}</a>`
+      : esc(name).replace(/([\u{1F1E6}-\u{1F1FF}]{2})$/u, '<span class="flag">$1</span>');   // flags a little larger
+    return `<li class="hb-row" tabindex="0" title="${esc(name)}: ${esc(more)}">` +
+      `<span class="hb-name">${label}</span>` +
+      `<span class="hb-bar"><i style="width:${Math.max(1.5, o.views / top * 100).toFixed(1)}%"></i></span>` +
+      `<span class="hb-num">${fmt(o.views)}</span><span class="hb-more">${more}</span></li>`;
+  }).join("");
+  el.onclick = e => {   // tap a row: show or hide its details (a tap on the page link just opens it)
+    if (e.target.closest("a")) return;
+    const row = e.target.closest(".hb-row");
+    if (row) row.classList.toggle("open");
+  };
+  el.onkeydown = e => { if ((e.key === "Enter" || e.key === " ") && e.target.classList.contains("hb-row")) { e.preventDefault(); e.target.classList.toggle("open"); } };
 }
 function webDonut(id, rows, nameOf) {
   const sum = webSum(webCut(rows), r => nameOf(r.k)), list = Object.entries(sum).sort((a, b) => b[1].views - a[1].views);
