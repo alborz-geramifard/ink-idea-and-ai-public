@@ -172,6 +172,12 @@ a.arrow.right { right: -64px; }
   ul.pills.icons a { width: 48px; height: 48px; }
   ul.pills a { padding: 10px 12px 10px 10px; font-size: 13px; gap: 8px; }
 }
+/* phones: a row of 8 icons wrapped 6 + 2, Threads and X alone on the second line; a 4 + 4 grid instead
+   (2026-11-02). Only rows of 7+ icons; shorter rows (a new cartoon not on every channel yet) wrap as before. */
+@media (max-width: 520px) {
+  ul.pills.icons:has(> li:nth-child(7)) { display: grid; grid-template-columns: repeat(4, auto); justify-content: center; }
+  .cartoon ul.pills.icons:has(> li:nth-child(7)) { justify-content: start; }   /* left-aligned, as on desktop */
+}
 /* the tagline in a deeper gold on the plate so the small caps stay readable */
 header.brand .plate p:not(.sub):not(.name) { color: color-mix(in srgb, var(--gold) 72%, var(--ink)); }
 /* top bar links: icon + word; on hover (and on the current page) an orange pill with black text and icon */
