@@ -205,8 +205,9 @@ a.icon.sitelink:hover { color: var(--text-primary); border-color: var(--accent);
 .hb-row:hover, .hb-row:focus-visible { background: var(--surface-0); outline: none; }
 .hb-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); text-align: right; }   /* hugs the bar; a flag sits right before it (user, 2026-11-02) */
 .hb-name .flag { font-size: 1.3em; line-height: 1; vertical-align: -0.12em; margin-left: 4px; }
-.hb-name a { color: inherit; text-decoration: none; }
-.hb-name a:hover { text-decoration: underline; }
+.hb-name a { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; max-width: 100%; vertical-align: middle; }
+.hb-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hb-name a:hover .hb-t { text-decoration: underline; }
 .hb-bar { height: 12px; }
 .hb-bar i { display: block; height: 100%; min-width: 3px; border-radius: 0 4px 4px 0; background: var(--bar); }
 .hb-num { min-width: 2.4em; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-primary); font-weight: 600; }
