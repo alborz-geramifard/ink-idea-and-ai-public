@@ -867,6 +867,12 @@ function pageLabel(path) {   // plain text for chart axes: "3 · Free Trial", "H
   if (/\/(ink-idea-and-ai-public\/?)?$/.test(path || "/")) return "Homepage";
   return (path || "/").replace("/ink-idea-and-ai-public", "") || "/";
 }
+function pageLast(path) {   // the bar lists: the title, then its No. circle right before the bar, like the flags (user, 2026-11-02)
+  const m = /cartoons\/(\d+)-[^/]*\/?$/.exec(path || "");
+  if (!m) return pageName(path);
+  const c = latest().cartoons[m[1]];
+  return `<span class="hb-t">${esc(c ? c.title : "")}</span>${num(m[1])}`;   // a long title shortens, the circle stays
+}
 function webTip(name, o, total) {
   return `<b>${esc(name)}</b><br>👁 <b>${fmt(o.views)}</b> views · ${fmt(o.views / total * 100)}%<br>` +
          `👤 <b>${fmt(o.visitors)}</b> visitors<br>⏱ <b>${secs(avgTime(o))}</b> on the page`;
@@ -887,7 +893,7 @@ function webBars(id, rows, nameOf, color, max = 12) {
   el.innerHTML = list.map(([name, o]) => {
     const more = `👤 ${fmt(o.visitors)} visitor${o.visitors === 1 ? "" : "s"} · ⏱ ${secs(avgTime(o))} on the page · ${fmt(o.views / total * 100)}% of views`;
     const label = link && keyOf[name] && /^\//.test(keyOf[name])
-      ? `<a href="${esc("https://alborz-geramifard.com" + keyOf[name])}" target="_blank" rel="noopener">${pageName(keyOf[name])}</a>`
+      ? `<a href="${esc("https://alborz-geramifard.com" + keyOf[name])}" target="_blank" rel="noopener">${pageLast(keyOf[name])}</a>`
       : esc(name).replace(/([\u{1F1E6}-\u{1F1FF}]{2})$/u, '<span class="flag">$1</span>');   // flags a little larger
     return `<li class="hb-row" tabindex="0" title="${esc(name)}: ${esc(more)}">` +
       `<span class="hb-name">${label}</span>` +
