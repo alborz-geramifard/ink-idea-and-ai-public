@@ -160,6 +160,7 @@ img.pl.pltag-img { margin-left: 3px; }
   .board th, .board td { padding: 7px 6px; }
   .board th:first-child, .board td:first-child { position: sticky; left: 0; background: var(--surface-1); z-index: 1; min-width: 150px; }
   .thumb { width: 24px; height: 43px; }
+  .board td:first-child .badge { display: none; }   /* drawing/living tag: shorter rows on phones (2026-11-02) */
   .cm-list { max-height: 360px; }
 }
 
@@ -196,3 +197,23 @@ a.icon.sitelink:hover { color: var(--text-primary); border-color: var(--accent);
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .dash-key { vertical-align: middle; margin: 0 2px; }   /* the dashed-line key in a card note */
+
+/* bar lists on the Website tab (pages, sources, countries): name | bar | number, tap for details (2026-11-02) */
+.hbars { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.hb-row { display: grid; grid-template-columns: minmax(0, 40%) minmax(0, 1fr) auto; align-items: center; column-gap: 10px;
+  padding: 5px 6px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+.hb-row:hover, .hb-row:focus-visible { background: var(--surface-0); outline: none; }
+.hb-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); text-align: right; }   /* hugs the bar; a flag sits right before it (user, 2026-11-02) */
+.hb-name .flag { font-size: 1.3em; line-height: 1; vertical-align: -0.12em; margin-left: 4px; }
+.hb-name a { color: inherit; text-decoration: none; }
+.hb-name a:hover { text-decoration: underline; }
+.hb-bar { height: 12px; }
+.hb-bar i { display: block; height: 100%; min-width: 3px; border-radius: 0 4px 4px 0; background: var(--bar); }
+.hb-num { min-width: 2.4em; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-primary); font-weight: 600; }
+.hb-more { grid-column: 1 / -1; display: none; padding-top: 4px; font-size: 12px; color: var(--text-muted); }
+.hb-row.open .hb-more { display: block; }
+.hb-empty { padding: 24px 0; text-align: center; color: var(--text-muted); font-size: 13px; }
+@media (max-width: 640px) {
+  .hb-row { grid-template-columns: minmax(0, 46%) minmax(0, 1fr) auto; font-size: 14px; padding: 7px 4px; }   /* bigger tap rows */
+}
+
