@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=4">
 <link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png?v=4">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=4">
-<link rel="stylesheet" href="dash.css?v=24">
+<link rel="stylesheet" href="dash.css?v=27">
 </head>
 <body>
 <!-- Sign in: the page holds no data; data.json is AES-256-GCM, key = PBKDF2(username + password) -->
@@ -107,11 +107,11 @@
         <div class="chart short" id="cWeb"></div>
       </article>
       <article class="card wide">
-        <div class="card-h"><h2>Pages</h2><span class="note">which cartoons people open · click a bar to open the page</span></div>
-        <div class="chart" id="webPages"></div>
+        <div class="card-h"><h2>Pages</h2><span class="note">which cartoons people open · tap a row for details, the name opens the page</span></div>
+        <ul class="hbars" id="webPages"></ul>
       </article>
-      <article class="card"><div class="card-h"><h2>Where visitors come from</h2></div><div class="chart" id="webRefs"></div></article>
-      <article class="card"><div class="card-h"><h2>Countries</h2></div><div class="chart" id="webCountries"></div></article>
+      <article class="card"><div class="card-h"><h2>Where visitors come from</h2></div><ul class="hbars" id="webRefs"></ul></article>
+      <article class="card"><div class="card-h"><h2>Countries</h2></div><ul class="hbars" id="webCountries"></ul></article>
       <article class="card"><div class="card-h"><h2>Devices</h2></div><div class="chart" id="webDevices"></div></article>
     </section>
     <p class="muted empty" id="webEmpty" hidden>No website visits recorded yet. The counter starts once it is set up and the site is published.</p>
@@ -121,6 +121,6 @@
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
-<script src="app.js?v=65"></script>
+<script src="app.js?v=67"></script>
 </body>
 </html>
