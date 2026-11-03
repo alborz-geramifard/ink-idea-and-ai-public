@@ -507,8 +507,15 @@ function withBadges(id, items) {   // draw now and again whenever the visible wi
   draw();
 }
 const platTip = ps => `<b>${ps[0].axisValueLabel}</b><br>` + ps.filter(x => x.value[1] != null).sort((a, b) => b.value[1] - a.value[1])
-  .map(x => `${byLabel(x.seriesName) ? iconHtml(byLabel(x.seriesName)) : esc(x.seriesName)} <b>${fmt(x.value[1])}</b>`).join("<br>");   // logos, biggest first
+  .map(x => `${x.seriesName === TOTAL ? inkImg : byLabel(x.seriesName) ? iconHtml(byLabel(x.seriesName)) : esc(x.seriesName)} <b>${fmt(x.value[1])}</b>`).join("<br>");   // logos, biggest first
 const platBadge = p => ({text: iconText(p.label), rich: richIcons(21), color: css(p.c), w: 21 + 14 + (p.tag === "image" ? 24 : p.tag ? p.tag.length * 7 + 4 : 0)});
+// the total of all lines, named by the Ink logo (user, 2026-11-03): in the brand gold, a bit thicker than the platform lines
+const TOTAL = "Total";
+const inkImg = `<img src="logo.png" alt="Total" title="Total" class="pl">`;
+const totalLook = () => lineLook(css("--accent"), {width: 3.5, opacity: .95});
+const totalBadge = () => ({text: "{ink|}", rich: {ink: {backgroundColor: {image: "logo.png"}, width: 22, height: 22}}, color: css("--accent"), w: 36});
+const totalSeries = (data, extra = {}) => ({name: TOTAL, type: "line", data, smooth: .25, symbol: "circle", symbolSize: 8,
+  showSymbol: data.length < 30, z: 3, ...totalLook(), ...extra});
 
 // zoom for the time charts: drag inside to pan, slider below to pick the window (the wheel scrolls the page)
 const timeZoom = () => [{type: "inside", filterMode: "none", zoomOnMouseWheel: false, moveOnMouseWheel: false},
@@ -523,6 +530,7 @@ function renderTrend() {
     return {name: p.label, type: "line", data: pts, smooth: .25, symbol: "circle", symbolSize: 8, showSymbol: pts.length < 30,
             ...lineLook(css(p.c), xDash(p))};
   });
+  series.push(totalSeries(r.map(s => [s.updated, allViews(s)])));
   const lo = t(r[0]), hi = t(latest());
   const flags = Object.entries(latest().cartoons).map(([n, c]) => [n, postedAt(c)])
     .filter(([, at]) => at && new Date(at).getTime() >= lo && new Date(at).getTime() <= hi);
@@ -542,7 +550,7 @@ function renderTrend() {
     graphic: r.length < 2 ? [{type: "text", left: "center", top: "middle",
       style: {text: "The trend fills in as refreshes come in (twice a day).", fill: css("--text-muted"), fontSize: 13}}] : [],
   }, true);
-  withBadges("cTrend", on().map(platBadge));
+  withBadges("cTrend", [...on().map(platBadge), totalBadge()]);
 }
 
 // views per cartoon by age: each line starts when its cartoon was posted, so old and new cartoons compare fairly
@@ -645,15 +653,17 @@ function renderEngTrend() {
     grid: {...o.grid, bottom: 52},   // room for the zoom slider, as on Views over time
     dataZoom: timeZoom(),
     tooltip: {...o.tooltip, formatter: ps => `<b>${ps[0].axisValueLabel}</b><br>` +   // icon then number, no gap
-      ps.slice().sort((a, b) => b.value[1] - a.value[1]).map(x => `${x.marker}${x.seriesName} <b>${fmt(x.value[1])}</b>`).join("<br>")},
+      ps.slice().sort((a, b) => b.value[1] - a.value[1]).map(x => `${x.seriesName === TOTAL ? inkImg : x.marker + x.seriesName} <b>${fmt(x.value[1])}</b>`).join("<br>")},
     xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
     series: ENG.map(([k, l, ic, c]) => ({
       name: ic, type: "line", step: "end", symbol: "circle", symbolSize: 8, showSymbol: r.length < 30,
       data: r.map(s => [s.updated, k === "new_followers" ? allFollowers(s) : engAll(s, k)]),
-      ...lineLook(css(c))})),
+      ...lineLook(css(c))})).concat(
+      // all interactions together (👍 💬 ↗ 🔖; new followers are not interactions)
+      totalSeries(r.map(s => [s.updated, allInter(s)]), {step: "end", smooth: false})),
   }, true);
-  withBadges("cEngTrend", ENG.map(([k, l, ic, c]) => ({text: ic, fontSize: 19, color: css(c), w: 40})));
+  withBadges("cEngTrend", [...ENG.map(([k, l, ic, c]) => ({text: ic, fontSize: 19, color: css(c), w: 40})), totalBadge()]);
 }
 
 function renderEngPosts() {
@@ -722,34 +732,36 @@ function spark(values) {
     <circle cx="${pts[pts.length - 1].split(",")[0]}" cy="${pts[pts.length - 1].split(",")[1]}" r="2.5" fill="var(--accent)"/></svg>`;
 }
 function renderBoard() {
-  const r = inRange(), now = latest(), first = r.length > 1 ? r[0] : null, ps = on();
+  const r = inRange(), now = latest(), ps = on();
+  const past = snaps().filter(s => t(s) <= t(now) - 864e5), day = past.length ? past[past.length - 1] : null;
   const rows = Object.entries(now.cartoons).map(([n, c]) => {
     const row = {n: +n, c, total: cartoonViews(c), inter: ps.reduce((a, p) => a + inter(c[p.k]), 0)};
     ENG.forEach(([k]) => { row[k] = eng(c, k); });
     row.rate = rate(c); row.tw = watch(c, "tiktok"); row.rw = watch(c, "instagram_reel");
     row.tc = c.tiktok && c.tiktok.completion_pct != null ? c.tiktok.completion_pct : null;
     ps.forEach(p => { row[p.k] = c[p.k] ? c[p.k].views : null; });
-    row.change = first && first.cartoons[n] ? row.total - cartoonViews(first.cartoons[n]) : null;
+    // views since the same time yesterday (user, 2026-11-03), not since the start of the shown range
+    row.change = !day ? null : day.cartoons[n] ? row.total - cartoonViews(day.cartoons[n]) : row.total;   // posted within the day: all of it
     row.trend = r.map(s => s.cartoons[n] ? cartoonViews(s.cartoons[n]) : 0);
     return row;
   });
   const {key, asc} = state.sort;
   rows.sort((a, b) => ((key === "n" ? a.n - b.n : (a[key] ?? -1) - (b[key] ?? -1))) * (asc ? 1 : -1));
-  const cols = [["n", "Cartoon"], ["total", "Views"], ...ps.map(p => [p.k, iconHtml(p)]), ["inter", `<span title="All interactions: likes, comments, shares, saves">Interactions</span>`], ...ENG.map(([k, l, ic]) => [k, `<span title="${l}">${ic}</span>`]),
+  const cols = [["n", "Cartoon"], ["total", "Views"], ["change", `<span title="Views since the same time yesterday">Δ (1D)</span>`], ...ps.map(p => [p.k, iconHtml(p)]), ["inter", `<span title="All interactions: likes, comments, shares, saves">Interactions</span>`], ...ENG.map(([k, l, ic]) => [k, `<span title="${l}">${ic}</span>`]),
                 ["rate", `<span title="Engagement rate: interactions per 100 views">Eng %</span>`],
                 ["tw", `<span title="TikTok average watch time">⏱ ${iconHtml(PLAT[0])}</span>`],
                 ["tc", `<span title="TikTok: watched to the end">✓ ${iconHtml(PLAT[0])}</span>`],
                 ["rw", `<span title="Instagram average watch time">⏱ ${iconHtml(PLAT[1])}</span>`],
-                ["change", "Change"], [null, "Trend"]];
+                [null, "Trend"]];
   $("board").innerHTML = `<thead><tr>${cols.map(([k, l]) =>
       `<th ${k ? `data-k="${k}"` : ""} class="${k === key ? "sorted" + (asc ? " asc" : "") : ""}">${l}</th>`).join("")}</tr></thead><tbody>` +
     rows.map(row => `<tr data-n="${row.n}" class="${row.n === state.sel ? "sel" : ""}">
       <td><div class="cell-cartoon">${thumb(row.n)}<span>${num(row.n)} ${esc(row.c.title)}${row.c.format ? `<span class="badge ${row.c.format}">${row.c.format}</span>` : ""}</span></div></td>
-      <td><b>${fmt(row.total)}</b></td>${ps.map(p => `<td>${fmt(row[p.k])}</td>`).join("")}
+      <td><b>${fmt(row.total)}</b></td>
+      <td>${row.change == null ? `<span class="muted">–</span>` : delta(row.total, row.total - row.change)}</td>${ps.map(p => `<td>${fmt(row[p.k])}</td>`).join("")}
       <td><b>${fmt(row.inter)}</b></td>${ENG.map(([k]) => `<td class="${row[k] ? "" : "muted"}">${fmt(row[k])}</td>`).join("")}
       <td>${row.rate == null ? "–" : fmt(row.rate, 1) + "%"}</td><td>${row.tw == null ? "–" : fmt(row.tw, 1) + " s"}</td>
       <td>${row.tc == null ? "–" : fmt(row.tc, 1) + "%"}</td><td>${row.rw == null ? "–" : fmt(row.rw, 1) + " s"}</td>
-      <td>${row.change == null ? `<span class="muted">–</span>` : delta(row.total, row.total - row.change)}</td>
       <td>${spark(row.trend)}</td></tr>`).join("") + "</tbody>";
   $("board").querySelector("thead").onclick = e => {
     const th = e.target.closest("th[data-k]"); if (!th) return;
@@ -789,6 +801,7 @@ function renderDetail() {
       name: p.label, type: "line", symbol: "circle", symbolSize: 8, showSymbol: r.length < 30, connectNulls: true,
       data: r.map(s => [s.updated, s.cartoons[n] && s.cartoons[n][p.k] ? s.cartoons[n][p.k].views : null]),
       ...lineLook(css(p.c), xDash(p))})).concat(
+      [totalSeries(r.map(s => [s.updated, s.cartoons[n] ? cartoonViews(s.cartoons[n]) : null]), {connectNulls: true})],
       // posted before tracking began: a dashed line from 0 at posting to the first reading (after the badged lines)
       ps.map(p => { const l = lead(p), f = r.find(s => s.cartoons[n] && s.cartoons[n][p.k]);
         return l.length && f ? {name: p.label, type: "line", silent: true, showSymbol: false, tooltip: {show: false},
@@ -797,7 +810,7 @@ function renderDetail() {
     graphic: r.length < 2 ? [{type: "text", left: "center", top: "middle",
       style: {text: "History builds up with each refresh.", fill: css("--text-muted"), fontSize: 13}}] : [],
   }, true);
-  withBadges("cDetail", ps.map(platBadge));
+  withBadges("cDetail", [...ps.map(platBadge), totalBadge()]);
   const line = (label, d, extra = "") => d ? `<div class="row"><span>${label}</span><span>${fmt(d.views)} views${extra}
       ${d.url && /^https:\/\//.test(d.url) ? ` · <a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">open ↗</a>` : ""}</span></div>` : "";
   const cms = commentList(n);
