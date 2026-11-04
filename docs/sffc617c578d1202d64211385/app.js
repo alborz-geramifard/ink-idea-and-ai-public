@@ -105,7 +105,7 @@ const t = s => new Date(s.updated).getTime();
 
 let DATA = null, charts = {}, fails = 0;
 let KEY = null, IV = null, REFRESH = "";   // the unlocked key + which data.json is shown, for live refreshes
-const state = {range: 0, off: new Set(), sort: {key: "total", asc: false}, sel: null, tab: "social"};
+const state = {range: 0, off: new Set(), sort: {key: "n", asc: false}, sel: null, tab: "social"};   // newest cartoon first (user, 2026-11-03)
 
 // ---- theme --------------------------------------------------------------------------
 try { const th = localStorage.getItem("ink-theme"); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
