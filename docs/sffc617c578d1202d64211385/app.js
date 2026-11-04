@@ -745,9 +745,14 @@ function renderBoard() {
     row.trend = r.map(s => s.cartoons[n] ? cartoonViews(s.cartoons[n]) : 0);
     return row;
   });
+  // column order (user, 2026-11-03): platforms by total views, biggest first, with the Instagram image always last;
+  // the interaction kinds the same way, by their totals
+  const sum = k => rows.reduce((a, row) => a + (row[k] || 0), 0);
+  const pcols = ps.slice().sort((a, b) => (a.k === "instagram_image") - (b.k === "instagram_image") || sum(b.k) - sum(a.k));
+  const ecols = ENG.slice().sort((a, b) => sum(b[0]) - sum(a[0]));
   const {key, asc} = state.sort;
   rows.sort((a, b) => ((key === "n" ? a.n - b.n : (a[key] ?? -1) - (b[key] ?? -1))) * (asc ? 1 : -1));
-  const cols = [["n", "Cartoon"], ["total", "Views"], ["change", `<span title="Views since the same time yesterday">Δ (1D)</span>`], ...ps.map(p => [p.k, iconHtml(p)]), ["inter", `<span title="All interactions: likes, comments, shares, saves">Interactions</span>`], ...ENG.map(([k, l, ic]) => [k, `<span title="${l}">${ic}</span>`]),
+  const cols = [["n", "Cartoon"], ["total", "Views"], ["change", `<span title="Views since the same time yesterday">Δ (1D)</span>`], ...pcols.map(p => [p.k, iconHtml(p)]), ["inter", `<span title="All interactions: likes, comments, shares, saves">Interactions</span>`], ...ecols.map(([k, l, ic]) => [k, `<span title="${l}">${ic}</span>`]),
                 ["rate", `<span title="Engagement rate: interactions per 100 views">Eng %</span>`],
                 ["tw", `<span title="TikTok average watch time">⏱ ${iconHtml(PLAT[0])}</span>`],
                 ["tc", `<span title="TikTok: watched to the end">✓ ${iconHtml(PLAT[0])}</span>`],
@@ -758,8 +763,8 @@ function renderBoard() {
     rows.map(row => `<tr data-n="${row.n}" class="${row.n === state.sel ? "sel" : ""}">
       <td><div class="cell-cartoon">${thumb(row.n)}<span>${num(row.n)} ${esc(row.c.title)}${row.c.format ? `<span class="badge ${row.c.format}">${row.c.format}</span>` : ""}</span></div></td>
       <td><b>${fmt(row.total)}</b></td>
-      <td>${row.change == null ? `<span class="muted">–</span>` : delta(row.total, row.total - row.change)}</td>${ps.map(p => `<td>${fmt(row[p.k])}</td>`).join("")}
-      <td><b>${fmt(row.inter)}</b></td>${ENG.map(([k]) => `<td class="${row[k] ? "" : "muted"}">${fmt(row[k])}</td>`).join("")}
+      <td>${row.change == null ? `<span class="muted">–</span>` : delta(row.total, row.total - row.change)}</td>${pcols.map(p => `<td>${fmt(row[p.k])}</td>`).join("")}
+      <td><b>${fmt(row.inter)}</b></td>${ecols.map(([k]) => `<td class="${row[k] ? "" : "muted"}">${fmt(row[k])}</td>`).join("")}
       <td>${row.rate == null ? "–" : fmt(row.rate, 1) + "%"}</td><td>${row.tw == null ? "–" : fmt(row.tw, 1) + " s"}</td>
       <td>${row.tc == null ? "–" : fmt(row.tc, 1) + "%"}</td><td>${row.rw == null ? "–" : fmt(row.rw, 1) + " s"}</td>
       <td>${spark(row.trend)}</td></tr>`).join("") + "</tbody>";
