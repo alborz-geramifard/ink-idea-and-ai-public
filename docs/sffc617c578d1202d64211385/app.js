@@ -514,9 +514,9 @@ const TOTAL = "Total";
 const inkImg = `<img src="logo.png" alt="Total" title="Total" class="pl">`;
 const totalLook = () => lineLook(css("--accent"), {width: 3.5, opacity: .95});
 const totalBadge = () => ({text: "{ink|}", rich: {ink: {backgroundColor: {image: "logo.png"}, width: 22, height: 22}}, color: css("--accent"), w: 36});
-// each chart's Total chip hides its total line (user, 2026-11-04); remembered per chart in this browser
-const noTotal = new Set((() => { try { return JSON.parse(localStorage.getItem("ink-no-total") || "[]"); } catch (e) { return []; } })());
-const showTotal = id => !noTotal.has(id);
+// each chart's Total chip shows its total line, off by default (user, 2026-11-04); remembered per chart in this browser
+const yesTotal = new Set((() => { try { return JSON.parse(localStorage.getItem("ink-total-on") || "[]"); } catch (e) { return []; } })());
+const showTotal = id => yesTotal.has(id);
 const withTotal = (id, list, item) => showTotal(id) ? list.concat(item) : list;
 const totalSeries = (data, extra = {}) => ({name: TOTAL, type: "line", data, smooth: .25, symbol: "circle", symbolSize: 8,
   showSymbol: data.length < 30, z: 3, ...totalLook(), ...extra});
@@ -839,8 +839,8 @@ document.querySelectorAll(".total-toggle").forEach(b => {
   const id = b.dataset.chart, sync = () => b.setAttribute("aria-pressed", String(showTotal(id)));
   sync();
   b.onclick = () => {
-    showTotal(id) ? noTotal.add(id) : noTotal.delete(id);
-    try { localStorage.setItem("ink-no-total", JSON.stringify([...noTotal])); } catch (e) {}
+    showTotal(id) ? yesTotal.delete(id) : yesTotal.add(id);
+    try { localStorage.setItem("ink-total-on", JSON.stringify([...yesTotal])); } catch (e) {}
     sync();
     ({cTrend: renderTrend, cEngTrend: renderEngTrend, cDetail: renderDetail})[id]();
   };
