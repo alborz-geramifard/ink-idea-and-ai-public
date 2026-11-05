@@ -521,11 +521,83 @@ const withTotal = (id, list, item) => showTotal(id) ? list.concat(item) : list;
 const totalSeries = (data, extra = {}) => ({name: TOTAL, type: "line", data, smooth: .25, symbol: "circle", symbolSize: 8,
   showSymbol: data.length < 30, z: 3, ...totalLook(), ...extra});
 
-// zoom for the time charts: drag inside to pan, slider below to pick the window (the wheel scrolls the page)
-const timeZoom = () => [{type: "inside", filterMode: "none", zoomOnMouseWheel: false, moveOnMouseWheel: false},
+// zoom (user, 2026-11-04): drag a box to zoom in, pinch / Ctrl+scroll to zoom, Shift+drag to pan, the slider below to fine-tune;
+// double-click or "Reset zoom" shows everything again. Plain scrolling still scrolls the page.
+const timeZoom = () => [{type: "inside", filterMode: "none", zoomOnMouseWheel: false, moveOnMouseWheel: false, moveOnMouseMove: "shift"},
   {type: "slider", filterMode: "none", height: 20, bottom: 6, borderColor: "transparent",
    fillerColor: "rgba(200,137,43,.15)", dataBackground: {lineStyle: {color: css("--text-muted")}, areaStyle: {opacity: 0}},
    handleStyle: {color: css("--accent")}, textStyle: {color: css("--text-muted")}}];
+
+// box zoom + reset for a chart with dataZoom; call after its setOption (and after withBadges, which clears datazoom handlers)
+function zoomUX(id) {
+  const ch = chart(id), el = $(id);
+  const zr = ch.getZr();
+  // drag a box: mousedown inside the plot, a shaded band follows the pointer, mouseup zooms the x axis to it
+  // (Shift+drag pans instead, via the inside dataZoom)
+  if (ch.__box) { zr.off("mousedown", ch.__box.down); zr.off("mousemove", ch.__box.move); zr.off("mouseup", ch.__box.up); }
+  let x0 = null, band = null;
+  const plot = () => ch.getModel().getComponent("grid").coordinateSystem.getRect();
+  const clear = () => { if (band) { zr.remove(band); band = null; } x0 = null; };
+  ch.__box = {
+    down: e => {
+      const r = plot();
+      if (e.event && e.event.shiftKey) return;
+      if (e.offsetX < r.x || e.offsetX > r.x + r.width || e.offsetY < r.y || e.offsetY > r.y + r.height) return;
+      x0 = e.offsetX;
+    },
+    move: e => {
+      if (x0 == null) return;
+      const r = plot(), x = Math.max(r.x, Math.min(r.x + r.width, e.offsetX));
+      if (!band) { band = new echarts.graphic.Rect({shape: {x: x0, y: r.y, width: 0, height: r.height}, silent: true, z: 100,
+                    style: {fill: "rgba(200,137,43,.15)", stroke: "rgba(200,137,43,.6)", lineWidth: 1}}); zr.add(band); }
+      band.setShape({x: Math.min(x0, x), width: Math.abs(x - x0)});
+    },
+    up: e => {
+      if (x0 == null) return;
+      const r = plot(), x = Math.max(r.x, Math.min(r.x + r.width, e.offsetX)), a = Math.min(x0, x), b = Math.max(x0, x);
+      clear();
+      if (b - a < 8) return;                                   // a click, not a drag
+      const v = px => ch.convertFromPixel({xAxisIndex: 0}, px);
+      ch.dispatchAction({type: "dataZoom", startValue: v(a), endValue: v(b)});
+    },
+  };
+  zr.on("mousedown", ch.__box.down); zr.on("mousemove", ch.__box.move); zr.on("mouseup", ch.__box.up);
+  // pinch on a trackpad (the browser sends it as Ctrl+wheel) or Ctrl/Cmd+scroll: zoom around the pointer; plain scroll = page
+  if (!el.__wheel) {
+    el.__wheel = e => {
+      if ((!e.ctrlKey && !e.metaKey) || !el.contains(e.target)) return;
+      const c = chart(id), z = (c.getOption().dataZoom || [])[0];
+      if (!z) return;
+      e.preventDefault();
+      const r = c.getModel().getComponent("grid").coordinateSystem.getRect();
+      const fx = Math.max(0, Math.min(1, (e.clientX - el.getBoundingClientRect().left - r.x) / r.width));
+      const k = Math.exp(Math.max(-60, Math.min(60, e.deltaY)) * 0.01), span = z.end - z.start;
+      const ns = Math.max(0.5, Math.min(100, span * k)), at = z.start + span * fx;
+      let a = at - ns * fx, b = a + ns;
+      if (a < 0) { b -= a; a = 0; } if (b > 100) { a -= b - 100; b = 100; }
+      c.dispatchAction({type: "dataZoom", start: Math.max(0, a), end: Math.min(100, b)});
+    };
+    // on the document, capture phase: a listener on the chart or its card never saw the event (something stops it on the way)
+    document.addEventListener("wheel", el.__wheel, {passive: false, capture: true});
+  }
+  let btn = el.parentElement.querySelector(".zoom-reset");
+  if (!btn) {
+    btn = document.createElement("button");
+    btn.className = "chip zoom-reset"; btn.type = "button"; btn.textContent = "Reset zoom"; btn.hidden = true;
+    el.parentElement.style.position = "relative";
+    el.parentElement.appendChild(btn);
+  }
+  const reset = () => ch.dispatchAction({type: "dataZoom", start: 0, end: 100});
+  btn.onclick = reset;
+  const sync = () => { const z = (ch.getOption().dataZoom || [])[0]; btn.hidden = !z || (z.start <= 0.5 && z.end >= 99.5); };
+  if (ch.__zoomSync) ch.off("datazoom", ch.__zoomSync);
+  ch.__zoomSync = () => setTimeout(sync);
+  ch.on("datazoom", ch.__zoomSync);
+  if (ch.__dbl) zr.off("dblclick", ch.__dbl);
+  ch.__dbl = reset;
+  zr.on("dblclick", ch.__dbl);
+  sync();
+}
 
 function renderTrend() {
   const r = inRange(), surface = css("--surface-1");
@@ -555,6 +627,7 @@ function renderTrend() {
       style: {text: "The trend fills in as refreshes come in (twice a day).", fill: css("--text-muted"), fontSize: 13}}] : [],
   }, true);
   withBadges("cTrend", withTotal("cTrend", on().map(platBadge), totalBadge()));
+  zoomUX("cTrend");
 }
 
 // views per cartoon by age: each line starts when its cartoon was posted, so old and new cartoons compare fairly
@@ -626,7 +699,7 @@ function renderAge() {
     xAxis: {...o.xAxis, type: "value", min: 0, minInterval: 1,
             axisLabel: {...o.xAxis.axisLabel, formatter: v => v ? `day ${Number.isInteger(v) ? v : fmt(v, 1)}` : "posted"}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
-    dataZoom: [{type: "inside", filterMode: "none", zoomOnMouseWheel: false, moveOnMouseWheel: false},   // as on Views over time
+    dataZoom: [{type: "inside", filterMode: "none", zoomOnMouseWheel: false, moveOnMouseWheel: false, moveOnMouseMove: "shift"},   // as on Views over time
                {type: "slider", filterMode: "none", height: 20, bottom: 6, borderColor: "transparent",
                fillerColor: "rgba(200,137,43,.15)", dataBackground: {lineStyle: {color: css("--text-muted")}, areaStyle: {opacity: 0}},
                handleStyle: {color: css("--accent")}, textStyle: {color: css("--text-muted")}, labelFormatter: v => age(v)}],
@@ -637,6 +710,7 @@ function renderAge() {
   const badge = n => ({text: `{num|${n}}`, rich: {num: {...numRich(22), backgroundColor: hue(n)}}, w: 28, group: n});   // circle = line colour
   withBadges("cAge", [...lines.map(([n]) => badge(n)),   // the dashed lead-ins badge their cartoon only when its solid line is out of view
                       ...lines.filter(([, d]) => d.length && d[0][0] > .1).map(([n]) => badge(n))]);
+  zoomUX("cAge");
 }
 
 function renderMix() {
@@ -672,6 +746,7 @@ function renderEngTrend() {
       showTotal("cEngTrend") ? [totalSeries(r.map(s => [s.updated, allInter(s)]), {step: "end", smooth: false})] : []),
   }, true);
   withBadges("cEngTrend", withTotal("cEngTrend", ENG.map(([k, l, ic, c]) => ({text: ic, fontSize: 19, color: css(c), w: 40})), totalBadge()));
+  zoomUX("cEngTrend");
 }
 
 function renderEngPosts() {
