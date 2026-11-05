@@ -558,9 +558,13 @@ function renderTrend() {
 }
 
 // views per cartoon by age: each line starts when its cartoon was posted, so old and new cartoons compare fairly
+const AGE_LAST = 5;
+const ageAll = () => { try { return localStorage.getItem("ink-age-all") === "1"; } catch (e) { return false; } };
 function renderAge() {
   const all = snaps(), o = base(), muted = css("--text-muted"), surface = css("--surface-1");
-  const cs = Object.entries(latest().cartoons).filter(([, c]) => postedAt(c)).sort((a, b) => +a[0] - +b[0]);
+  // the last 5 cartoons by default; "All cartoons" shows every one (user, 2026-11-04), remembered in this browser
+  const cs = Object.entries(latest().cartoons).filter(([, c]) => postedAt(c)).sort((a, b) => +a[0] - +b[0])
+    .slice(ageAll() ? 0 : -AGE_LAST);
   const days = (s, at) => (t(s) - new Date(at).getTime()) / 864e5;
   const lines = cs.map(([n, c]) => {
     const at = postedAt(c);
@@ -845,6 +849,13 @@ document.querySelectorAll(".total-toggle").forEach(b => {
     ({cTrend: renderTrend, cEngTrend: renderEngTrend, cDetail: renderDetail})[id]();
   };
 });
+
+{ const b = $("ageAll");
+  if (b) {
+    const sync = () => b.setAttribute("aria-pressed", String(ageAll()));
+    sync();
+    b.onclick = () => { try { localStorage.setItem("ink-age-all", ageAll() ? "0" : "1"); } catch (e) {} sync(); renderAge(); };
+  } }
 
 function renderAll() {
   document.querySelectorAll("#range button").forEach(b => b.classList.toggle("on", +b.dataset.r === state.range));
