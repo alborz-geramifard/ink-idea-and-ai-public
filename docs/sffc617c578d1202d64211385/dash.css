@@ -225,3 +225,6 @@ a.icon.sitelink:hover { color: var(--text-primary); border-color: var(--accent);
   .hb-row { grid-template-columns: minmax(0, 46%) minmax(0, 1fr) auto; font-size: 14px; padding: 7px 4px; }   /* bigger tap rows */
 }
 
+
+.zoom-reset { position: absolute; top: 46px; right: 14px; z-index: 2; cursor: pointer; padding: 3px 9px; font-size: 12px; }   /* shown only while zoomed */
+.zoom-reset[hidden] { display: none; }
