@@ -514,6 +514,10 @@ const TOTAL = "Total";
 const inkImg = `<img src="logo.png" alt="Total" title="Total" class="pl">`;
 const totalLook = () => lineLook(css("--accent"), {width: 3.5, opacity: .95});
 const totalBadge = () => ({text: "{ink|}", rich: {ink: {backgroundColor: {image: "logo.png"}, width: 22, height: 22}}, color: css("--accent"), w: 36});
+// each chart's Total chip hides its total line (user, 2026-11-04); remembered per chart in this browser
+const noTotal = new Set((() => { try { return JSON.parse(localStorage.getItem("ink-no-total") || "[]"); } catch (e) { return []; } })());
+const showTotal = id => !noTotal.has(id);
+const withTotal = (id, list, item) => showTotal(id) ? list.concat(item) : list;
 const totalSeries = (data, extra = {}) => ({name: TOTAL, type: "line", data, smooth: .25, symbol: "circle", symbolSize: 8,
   showSymbol: data.length < 30, z: 3, ...totalLook(), ...extra});
 
@@ -530,7 +534,7 @@ function renderTrend() {
     return {name: p.label, type: "line", data: pts, smooth: .25, symbol: "circle", symbolSize: 8, showSymbol: pts.length < 30,
             ...lineLook(css(p.c), xDash(p))};
   });
-  series.push(totalSeries(r.map(s => [s.updated, allViews(s)])));
+  if (showTotal("cTrend")) series.push(totalSeries(r.map(s => [s.updated, allViews(s)])));
   const lo = t(r[0]), hi = t(latest());
   const flags = Object.entries(latest().cartoons).map(([n, c]) => [n, postedAt(c)])
     .filter(([, at]) => at && new Date(at).getTime() >= lo && new Date(at).getTime() <= hi);
@@ -550,7 +554,7 @@ function renderTrend() {
     graphic: r.length < 2 ? [{type: "text", left: "center", top: "middle",
       style: {text: "The trend fills in as refreshes come in (twice a day).", fill: css("--text-muted"), fontSize: 13}}] : [],
   }, true);
-  withBadges("cTrend", [...on().map(platBadge), totalBadge()]);
+  withBadges("cTrend", withTotal("cTrend", on().map(platBadge), totalBadge()));
 }
 
 // views per cartoon by age: each line starts when its cartoon was posted, so old and new cartoons compare fairly
@@ -661,9 +665,9 @@ function renderEngTrend() {
       data: r.map(s => [s.updated, k === "new_followers" ? allFollowers(s) : engAll(s, k)]),
       ...lineLook(css(c))})).concat(
       // all interactions together (👍 💬 ↗ 🔖; new followers are not interactions)
-      totalSeries(r.map(s => [s.updated, allInter(s)]), {step: "end", smooth: false})),
+      showTotal("cEngTrend") ? [totalSeries(r.map(s => [s.updated, allInter(s)]), {step: "end", smooth: false})] : []),
   }, true);
-  withBadges("cEngTrend", [...ENG.map(([k, l, ic, c]) => ({text: ic, fontSize: 19, color: css(c), w: 40})), totalBadge()]);
+  withBadges("cEngTrend", withTotal("cEngTrend", ENG.map(([k, l, ic, c]) => ({text: ic, fontSize: 19, color: css(c), w: 40})), totalBadge()));
 }
 
 function renderEngPosts() {
@@ -806,7 +810,7 @@ function renderDetail() {
       name: p.label, type: "line", symbol: "circle", symbolSize: 8, showSymbol: r.length < 30, connectNulls: true,
       data: r.map(s => [s.updated, s.cartoons[n] && s.cartoons[n][p.k] ? s.cartoons[n][p.k].views : null]),
       ...lineLook(css(p.c), xDash(p))})).concat(
-      [totalSeries(r.map(s => [s.updated, s.cartoons[n] ? cartoonViews(s.cartoons[n]) : null]), {connectNulls: true})],
+      showTotal("cDetail") ? [totalSeries(r.map(s => [s.updated, s.cartoons[n] ? cartoonViews(s.cartoons[n]) : null]), {connectNulls: true})] : [],
       // posted before tracking began: a dashed line from 0 at posting to the first reading (after the badged lines)
       ps.map(p => { const l = lead(p), f = r.find(s => s.cartoons[n] && s.cartoons[n][p.k]);
         return l.length && f ? {name: p.label, type: "line", silent: true, showSymbol: false, tooltip: {show: false},
@@ -815,7 +819,7 @@ function renderDetail() {
     graphic: r.length < 2 ? [{type: "text", left: "center", top: "middle",
       style: {text: "History builds up with each refresh.", fill: css("--text-muted"), fontSize: 13}}] : [],
   }, true);
-  withBadges("cDetail", [...ps.map(platBadge), totalBadge()]);
+  withBadges("cDetail", withTotal("cDetail", ps.map(platBadge), totalBadge()));
   const line = (label, d, extra = "") => d ? `<div class="row"><span>${label}</span><span>${fmt(d.views)} views${extra}
       ${d.url && /^https:\/\//.test(d.url) ? ` · <a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">open ↗</a>` : ""}</span></div>` : "";
   const cms = commentList(n);
@@ -831,6 +835,17 @@ function renderDetail() {
 }
 
 // ---- everything ---------------------------------------------------------------------
+document.querySelectorAll(".total-toggle").forEach(b => {
+  const id = b.dataset.chart, sync = () => b.setAttribute("aria-pressed", String(showTotal(id)));
+  sync();
+  b.onclick = () => {
+    showTotal(id) ? noTotal.add(id) : noTotal.delete(id);
+    try { localStorage.setItem("ink-no-total", JSON.stringify([...noTotal])); } catch (e) {}
+    sync();
+    ({cTrend: renderTrend, cEngTrend: renderEngTrend, cDetail: renderDetail})[id]();
+  };
+});
+
 function renderAll() {
   document.querySelectorAll("#range button").forEach(b => b.classList.toggle("on", +b.dataset.r === state.range));
   const now = latest(), errs = Object.keys(now.errors || {});
