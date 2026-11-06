@@ -228,3 +228,6 @@ a.icon.sitelink:hover { color: var(--text-primary); border-color: var(--accent);
 
 .zoom-reset { position: absolute; top: 46px; right: 14px; z-index: 2; cursor: pointer; padding: 3px 9px; font-size: 12px; }   /* shown only while zoomed */
 .zoom-reset[hidden] { display: none; }
+.posts-toggle { cursor: pointer; margin-left: auto; padding: 3px 9px; font-size: 12px; }   /* per chart: show/hide the post lines */
+.posts-toggle[aria-pressed="false"] { opacity: .45; text-decoration: line-through; }
+.posts-toggle + .total-toggle { margin-left: 6px; }
