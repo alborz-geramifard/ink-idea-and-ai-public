@@ -140,6 +140,7 @@ main.cartoon { padding-top: 16px; }
 .cartoon figcaption { margin-top: 24px; }
 .cartoon h1 { font-size: 34px; margin: 6px 0 8px; }
 .cartoon .question { color: var(--muted); margin: -8px 0 0; }
+.cartoon .credit { color: var(--muted); margin: 10px 0 0; font-size: 15px; }
 .cartoon ul.pills { justify-content: flex-start; }
 .stage { position: relative; }
 a.arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 46px; height: 46px; border-radius: 50%;
