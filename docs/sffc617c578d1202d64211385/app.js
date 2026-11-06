@@ -599,6 +599,21 @@ function zoomUX(id) {
   sync();
 }
 
+// a dashed, numbered line at each post in range; each chart's Posts chip hides them (user, 2026-11-06), on by default
+const noPosts = new Set((() => { try { return JSON.parse(localStorage.getItem("ink-posts-off") || "[]"); } catch (e) { return []; } })());
+const showPosts = id => !noPosts.has(id);
+function postLines(id, series, r) {
+  if (!showPosts(id) || !series.length || !r.length) return;
+  const lo = t(r[0]), hi = t(latest());
+  const flags = Object.entries(latest().cartoons).map(([n, c]) => [n, postedAt(c)])
+    .filter(([, at]) => at && new Date(at).getTime() >= lo && new Date(at).getTime() <= hi);
+  if (flags.length) series[0].markLine = {
+    symbol: "none", silent: true, animation: false,
+    lineStyle: {color: css("--text-muted"), type: "dashed", width: 1},
+    label: {formatter: d => `{num|${d.name}}`, position: "end", distance: 4, rich: {num: numRich(18)}},   // upright, above the plot
+    data: flags.map(([n, at]) => ({name: n, xAxis: at}))};
+}
+
 function renderTrend() {
   const r = inRange(), surface = css("--surface-1");
   const series = on().map(p => {
@@ -607,14 +622,7 @@ function renderTrend() {
             ...lineLook(css(p.c), xDash(p))};
   });
   if (showTotal("cTrend")) series.push(totalSeries(r.map(s => [s.updated, allViews(s)])));
-  const lo = t(r[0]), hi = t(latest());
-  const flags = Object.entries(latest().cartoons).map(([n, c]) => [n, postedAt(c)])
-    .filter(([, at]) => at && new Date(at).getTime() >= lo && new Date(at).getTime() <= hi);
-  if (series.length && flags.length) series[0].markLine = {
-    symbol: "none", silent: true, animation: false,
-    lineStyle: {color: css("--text-muted"), type: "dashed", width: 1},
-    label: {formatter: d => `{num|${d.name}}`, position: "end", distance: 4, rich: {num: numRich(18)}},   // upright, above the plot
-    data: flags.map(([n, at]) => ({name: n, xAxis: at}))};
+  postLines("cTrend", series, r);
   const o = base();
   chart("cTrend").setOption({
     ...o, series, legend: {...o.legend, show: false},
@@ -730,6 +738,13 @@ function renderMix() {
 // ---- engagement ------------------------------------------------------------------
 function renderEngTrend() {
   const r = inRange(), o = base(), surface = css("--surface-1");
+  const engSeries = ENG.map(([k, l, ic, c]) => ({
+      name: ic, type: "line", step: "end", symbol: "circle", symbolSize: 8, showSymbol: r.length < 30,
+      data: r.map(s => [s.updated, k === "new_followers" ? allFollowers(s) : engAll(s, k)]),
+      ...lineLook(css(c))})).concat(
+      // all interactions together (👍 💬 ↗ 🔖; new followers are not interactions)
+      showTotal("cEngTrend") ? [totalSeries(r.map(s => [s.updated, allInter(s)]), {step: "end", smooth: false})] : []);
+  postLines("cEngTrend", engSeries, r);
   chart("cEngTrend").setOption({
     ...o, legend: {show: false},
     grid: {...o.grid, bottom: 52},   // room for the zoom slider, as on Views over time
@@ -738,12 +753,7 @@ function renderEngTrend() {
       ps.slice().sort((a, b) => b.value[1] - a.value[1]).map(x => `${x.seriesName === TOTAL ? inkImg : x.marker + x.seriesName} <b>${fmt(x.value[1])}</b>`).join("<br>")},
     xAxis: {...o.xAxis, type: "time", ...dayTicks(r), axisLabel: {...o.xAxis.axisLabel, formatter: TIME_LABELS, hideOverlap: true}},
     yAxis: {...o.yAxis, type: "value", minInterval: 1},
-    series: ENG.map(([k, l, ic, c]) => ({
-      name: ic, type: "line", step: "end", symbol: "circle", symbolSize: 8, showSymbol: r.length < 30,
-      data: r.map(s => [s.updated, k === "new_followers" ? allFollowers(s) : engAll(s, k)]),
-      ...lineLook(css(c))})).concat(
-      // all interactions together (👍 💬 ↗ 🔖; new followers are not interactions)
-      showTotal("cEngTrend") ? [totalSeries(r.map(s => [s.updated, allInter(s)]), {step: "end", smooth: false})] : []),
+    series: engSeries,
   }, true);
   withBadges("cEngTrend", withTotal("cEngTrend", ENG.map(([k, l, ic, c]) => ({text: ic, fontSize: 19, color: css(c), w: 40})), totalBadge()));
   zoomUX("cEngTrend");
@@ -922,6 +932,17 @@ document.querySelectorAll(".total-toggle").forEach(b => {
     try { localStorage.setItem("ink-total-on", JSON.stringify([...yesTotal])); } catch (e) {}
     sync();
     ({cTrend: renderTrend, cEngTrend: renderEngTrend, cDetail: renderDetail})[id]();
+  };
+});
+
+document.querySelectorAll(".posts-toggle").forEach(b => {
+  const id = b.dataset.chart, sync = () => b.setAttribute("aria-pressed", String(showPosts(id)));
+  sync();
+  b.onclick = () => {
+    showPosts(id) ? noPosts.add(id) : noPosts.delete(id);
+    try { localStorage.setItem("ink-posts-off", JSON.stringify([...noPosts])); } catch (e) {}
+    sync();
+    ({cTrend: renderTrend, cEngTrend: renderEngTrend})[id]();
   };
 });
 
