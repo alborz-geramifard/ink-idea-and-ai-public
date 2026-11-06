@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=4">
 <link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png?v=4">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=4">
-<link rel="stylesheet" href="dash.css?v=31">
+<link rel="stylesheet" href="dash.css?v=32">
 </head>
 <body>
 <!-- Sign in: the page holds no data; data.json is AES-256-GCM, key = PBKDF2(username + password) -->
@@ -54,7 +54,7 @@
 
   <section class="grid">
     <article class="card wide">
-      <div class="card-h"><h2>Views over time</h2><button class="chip total-toggle" data-chart="cTrend" aria-pressed="true" title="Show or hide the total line"><img src="logo.png" alt="" class="pl"> Total</button></div>
+      <div class="card-h"><h2>Views over time</h2><button class="chip posts-toggle" data-chart="cTrend" aria-pressed="true" title="Show or hide a line at each post"><svg width="14" height="12" viewBox="0 0 14 12" aria-hidden="true"><line x1="7" y1="1" x2="7" y2="11" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2"/></svg> Posts</button><button class="chip total-toggle" data-chart="cTrend" aria-pressed="true" title="Show or hide the total line"><img src="logo.png" alt="" class="pl"> Total</button></div>
       <div class="chart" id="cTrend"></div>
     </article>
 
@@ -64,7 +64,7 @@
     </article>
 
     <article class="card wide">
-      <div class="card-h"><h2>Engagement over time</h2><span class="note">👍 💬 ↗ 🔖 (all posts) and 👤 total</span><button class="chip total-toggle" data-chart="cEngTrend" aria-pressed="true" title="Show or hide the total line"><img src="logo.png" alt="" class="pl"> Total</button></div>
+      <div class="card-h"><h2>Engagement over time</h2><span class="note">👍 💬 ↗ 🔖 (all posts) and 👤 total</span><button class="chip posts-toggle" data-chart="cEngTrend" aria-pressed="true" title="Show or hide a line at each post"><svg width="14" height="12" viewBox="0 0 14 12" aria-hidden="true"><line x1="7" y1="1" x2="7" y2="11" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2"/></svg> Posts</button><button class="chip total-toggle" data-chart="cEngTrend" aria-pressed="true" title="Show or hide the total line"><img src="logo.png" alt="" class="pl"> Total</button></div>
       <div class="chart" id="cEngTrend"></div>
     </article>
 
@@ -121,6 +121,6 @@
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
-<script src="app.js?v=80"></script>
+<script src="app.js?v=81"></script>
 </body>
 </html>
