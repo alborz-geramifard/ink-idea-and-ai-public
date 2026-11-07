@@ -761,7 +761,8 @@ function renderEngTrend() {
 
 function renderEngPosts() {
   const total = c => ENG.reduce((a, [k]) => a + eng(c, k), 0);
-  const cs = Object.entries(latest().cartoons).sort((a, b) => total(b[1]) - total(a[1]) || +a[0] - +b[0]),   // most engaged first
+  const key = perfSort() === "views" ? cartoonViews : total;   // the "Sort by" chips (user, 2026-11-07)
+  const cs = Object.entries(latest().cartoons).sort((a, b) => key(b[1]) - key(a[1]) || +a[0] - +b[0]),   // highest first
         o = base(), surface = css("--surface-1");
   const any = cs.some(([, c]) => ENG.some(([k]) => eng(c, k)));
   chart("cEngPosts").setOption({
@@ -945,6 +946,12 @@ document.querySelectorAll(".posts-toggle").forEach(b => {
     ({cTrend: renderTrend, cEngTrend: renderEngTrend})[id]();
   };
 });
+
+const perfSort = () => { try { return localStorage.getItem("ink-perf-sort") || "eng"; } catch (e) { return "eng"; } };
+{ const bs = document.querySelectorAll(".perf-sort [data-sort]");
+  const sync = () => bs.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.sort === perfSort())));
+  sync();
+  bs.forEach(b => b.onclick = () => { try { localStorage.setItem("ink-perf-sort", b.dataset.sort); } catch (e) {} sync(); renderEngPosts(); }); }
 
 { const b = $("ageAll");
   if (b) {
