@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://ink-analytics.inkideaandai.workers.dev; font-src 'self'; base-uri 'none'; form-action 'none'">
+<title>Ink Stats</title>
+<link rel="icon" href="favicon.ico?v=4" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=4">
+<link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png?v=4">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=4">
+<link rel="stylesheet" href="dash.css?v=33">
+</head>
+<body>
+<!-- Sign in: the page holds no data; data.json is AES-256-GCM, key = PBKDF2(username + password) -->
+<section id="login" class="login">
+  <form id="loginForm" autocomplete="on">
+    <img src="logo.png" alt="" class="logo">
+    <h1>Ink Stats</h1>
+    <p class="muted">Private dashboard</p>
+    <label>Username <input id="user" name="username" autocomplete="username" required></label>
+    <label>Password <input id="pass" name="password" type="password" autocomplete="current-password" required></label>
+    <button id="signin" type="submit">Sign in</button>
+    <p id="loginMsg" class="msg" role="status"></p>
+  </form>
+</section>
+
+<main id="app" hidden>
+  <header class="top">
+    <div class="brand"><img src="logo.png" alt="" class="logo sm"><div><h1>Ink Stats</h1><p class="muted" id="updated"></p></div></div>
+    <div class="controls" role="toolbar" aria-label="Filters">
+      <div class="seg" id="tab" role="tablist" aria-label="View">
+        <button data-t="social" class="on" role="tab">Social</button><button data-t="web" role="tab">Website</button>
+      </div>
+      <div class="seg" id="range" role="radiogroup" aria-label="Time range">
+        <button data-r="1">24 h</button><button data-r="7">7 d</button><button data-r="30">30 d</button><button data-r="0" class="on">All</button>
+      </div>
+      <a class="icon sitelink" href="../" target="_blank" rel="noopener" title="Open the website">Website ↗</a>
+      <button class="icon" id="refresh" title="Get fresh numbers now (all platforms except X)" aria-label="Refresh stats">↻</button>
+      <button class="icon" id="theme" title="Light / dark" aria-label="Toggle light or dark">◐</button>
+      <button class="icon" id="lock" title="Sign out" aria-label="Sign out">⏻</button>
+    </div>
+  </header>
+
+  <div id="socialView">
+  <section class="card changes-card" aria-label="What changed">
+    <div class="card-h"><h2>What changed</h2><span class="note">last 24 hours</span></div>
+    <div id="changes"></div>
+  </section>
+
+  <section class="tiles" id="tiles" aria-label="Headline numbers"></section>
+
+  <section class="grid">
+    <article class="card wide">
+      <div class="card-h"><h2>Views over time</h2><button class="chip posts-toggle" data-chart="cTrend" aria-pressed="true" title="Show or hide a line at each post"><svg width="14" height="12" viewBox="0 0 14 12" aria-hidden="true"><line x1="7" y1="1" x2="7" y2="11" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2"/></svg> Posts</button><button class="chip total-toggle" data-chart="cTrend" aria-pressed="true" title="Show or hide the total line"><img src="logo.png" alt="" class="pl"> Total</button></div>
+      <div class="chart" id="cTrend"></div>
+    </article>
+
+    <article class="card wide">
+      <div class="card-h"><h2>Views since posting</h2><span class="note"><svg class="dash-key" width="26" height="8" viewBox="0 0 26 8" aria-label="dashed line"><line x1="1" y1="4" x2="25" y2="4" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3" stroke-linecap="round"/></svg> tracking not available</span><button class="chip total-toggle" id="ageAll" aria-pressed="false" title="Show every cartoon instead of the last 5">All cartoons</button></div>
+      <div class="chart" id="cAge"></div>
+    </article>
+
+    <article class="card wide">
+      <div class="card-h"><h2>Engagement over time</h2><span class="note">👍 💬 ↗ 🔖 (all posts) and 👤 total</span><button class="chip posts-toggle" data-chart="cEngTrend" aria-pressed="true" title="Show or hide a line at each post"><svg width="14" height="12" viewBox="0 0 14 12" aria-hidden="true"><line x1="7" y1="1" x2="7" y2="11" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2"/></svg> Posts</button><button class="chip total-toggle" data-chart="cEngTrend" aria-pressed="true" title="Show or hide the total line"><img src="logo.png" alt="" class="pl"> Total</button></div>
+      <div class="chart" id="cEngTrend"></div>
+    </article>
+
+    <article class="card wide">
+      <div class="card-h"><h2>Performance per Cartoon</h2><span class="card-tools perf-sort" role="group" aria-label="Sort by"><span class="note">Sort by</span><button class="chip" data-sort="eng" aria-pressed="true" title="Most likes, comments, shares and saves first">👍 Engagement</button><button class="chip" data-sort="views" aria-pressed="false" title="Most views first">👁 Views</button></span></div>
+      <div class="chart short" id="cEngPosts"></div>
+    </article>
+
+    <article class="card wide">
+      <div class="card-h"><h2>Where the views come from</h2></div>
+      <div class="chart short" id="cMix"></div>
+    </article>
+
+    <article class="card wide">
+      <div class="card-h"><h2>Cartoons</h2><span class="note">Click a row for its history. Sort by any column.</span></div>
+      <div class="scroll"><table id="board" class="board"></table></div>
+    </article>
+
+    <article class="card wide">
+      <div class="card-h"><h2>Comments</h2><span class="note" id="commentCount"></span></div>
+      <div id="comments" class="cm-list"></div>
+    </article>
+
+    <article class="card wide" id="detail" hidden>
+      <div class="card-h"><h2 id="detailTitle"></h2><span class="card-tools"><button class="chip total-toggle" data-chart="cDetail" aria-pressed="true" title="Show or hide the total line"><img src="logo.png" alt="" class="pl"> Total</button><button class="icon" id="closeDetail" aria-label="Close">✕</button></span></div>
+      <div class="detail-grid">
+        <div class="chart" id="cDetail"></div>
+        <div id="detailStats" class="detail-stats"></div>
+      </div>
+    </article>
+
+  </section>
+  </div>
+
+  <div id="webView" hidden>
+    <section class="tiles" id="webTiles" aria-label="Website headline numbers"></section>
+    <section class="grid">
+      <article class="card wide">
+        <div class="card-h"><h2>Visits per day</h2><span class="note">a visitor counts once a day</span></div>
+        <div class="chart short" id="cWeb"></div>
+      </article>
+      <article class="card wide">
+        <div class="card-h"><h2>Pages</h2><span class="note">which cartoons people open · tap a row for details, the name opens the page</span></div>
+        <ul class="hbars" id="webPages"></ul>
+      </article>
+      <article class="card"><div class="card-h"><h2>Where visitors come from</h2></div><ul class="hbars" id="webRefs"></ul></article>
+      <article class="card"><div class="card-h"><h2>Countries</h2></div><ul class="hbars" id="webCountries"></ul></article>
+      <article class="card"><div class="card-h"><h2>Devices</h2></div><div class="chart" id="webDevices"></div></article>
+    </section>
+    <p class="muted empty" id="webEmpty" hidden>No website visits recorded yet. The counter starts once it is set up and the site is published.</p>
+  </div>
+
+  <footer class="muted">Refreshed every 10 minutes and whenever this page opens (X every 3 h) · data encrypted end to end · stays signed in for 1 day on this browser</footer>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+<script src="app.js?v=83"></script>
+</body>
+</html>
