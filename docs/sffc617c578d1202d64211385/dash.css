@@ -89,7 +89,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 20px 16px 40px; }
 .card-tools .total-toggle { margin-left: 0; }
 #ageAll { margin-left: 8px; }
 #ageAll[aria-pressed="false"] { opacity: 1; text-decoration: none; }
-#ageAll[aria-pressed="true"] { background: var(--text-primary); color: var(--surface-1); border-color: var(--text-primary); }
+#ageAll[aria-pressed="true"], .perf-sort .chip[aria-pressed="true"] { background: var(--text-primary); color: var(--surface-1); border-color: var(--text-primary); }
 .icon { border: 1px solid var(--border); background: var(--surface-1); border-radius: 10px; width: 34px; height: 34px; }
 
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px; }
@@ -231,3 +231,4 @@ a.icon.sitelink:hover { color: var(--text-primary); border-color: var(--accent);
 .posts-toggle { cursor: pointer; margin-left: auto; padding: 3px 9px; font-size: 12px; }   /* per chart: show/hide the post lines */
 .posts-toggle[aria-pressed="false"] { opacity: .45; text-decoration: line-through; }
 .posts-toggle + .total-toggle { margin-left: 6px; }
+.perf-sort .chip { cursor: pointer; }
