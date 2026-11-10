@@ -850,14 +850,15 @@ function renderBoard() {
     row.trend = r.map(s => s.cartoons[n] ? cartoonViews(s.cartoons[n]) : 0);
     return row;
   });
-  // column order (user, 2026-11-03): platforms by total views, biggest first, with the Instagram image always last;
-  // the interaction kinds the same way, by their totals
+  // column order (user, 2026-11-03): platforms by total views, biggest first; the interaction kinds the same way, by their totals.
+  // No Instagram image column (user, 2026-11-09: feed images stopped 2026-11-02), but its views and interactions still
+  // count in the Views, Δ (1D), Interactions and per-kind columns
   const sum = k => rows.reduce((a, row) => a + (row[k] || 0), 0);
-  const pcols = ps.slice().sort((a, b) => (a.k === "instagram_image") - (b.k === "instagram_image") || sum(b.k) - sum(a.k));
+  const pcols = ps.filter(p => p.k !== "instagram_image").sort((a, b) => sum(b.k) - sum(a.k));
   const ecols = ENG.slice().sort((a, b) => sum(b[0]) - sum(a[0]));
   const {key, asc} = state.sort;
   rows.sort((a, b) => ((key === "n" ? a.n - b.n : (a[key] ?? -1) - (b[key] ?? -1))) * (asc ? 1 : -1));
-  const cols = [["n", "Cartoon"], ["total", "Views"], ["change", `<span title="Views since the same time yesterday">Δ (1D)</span>`], ...pcols.map(p => [p.k, iconHtml(p)]), ["inter", `<span title="All interactions: likes, comments, shares, saves">Interactions</span>`], ...ecols.map(([k, l, ic]) => [k, `<span title="${l}">${ic}</span>`]),
+  const cols = [["n", "Cartoon"], ["total", `<span title="Total views on all platforms">∑</span>`], ["change", `<span title="Views since the same time yesterday">Δ (1D)</span>`], ...pcols.map(p => [p.k, iconHtml(p)]), ["inter", `<span title="Total interactions: likes, comments, shares, saves">∑</span>`], ...ecols.map(([k, l, ic]) => [k, `<span title="${l}">${ic}</span>`]),
                 ["rate", `<span title="Engagement rate: interactions per 100 views">Eng %</span>`],
                 ["tw", `<span title="TikTok average watch time">⏱ ${iconHtml(PLAT[0])}</span>`],
                 ["tc", `<span title="TikTok: watched to the end">✓ ${iconHtml(PLAT[0])}</span>`],
@@ -866,7 +867,7 @@ function renderBoard() {
   $("board").innerHTML = `<thead><tr>${cols.map(([k, l]) =>
       `<th ${k ? `data-k="${k}"` : ""} class="${k === key ? "sorted" + (asc ? " asc" : "") : ""}">${l}</th>`).join("")}</tr></thead><tbody>` +
     rows.map(row => `<tr data-n="${row.n}" class="${row.n === state.sel ? "sel" : ""}">
-      <td><div class="cell-cartoon">${thumb(row.n)}<span>${num(row.n)} ${esc(row.c.title)}${row.c.format ? `<span class="badge ${row.c.format}">${row.c.format}</span>` : ""}</span></div></td>
+      <td><div class="cell-cartoon">${thumb(row.n)}<span>${num(row.n)} ${esc(row.c.title)}</span></div></td>
       <td><b>${fmt(row.total)}</b></td>
       <td>${row.change == null ? `<span class="muted">–</span>` : delta(row.total, row.total - row.change)}</td>${pcols.map(p => `<td>${fmt(row[p.k])}</td>`).join("")}
       <td><b>${fmt(row.inter)}</b></td>${ecols.map(([k]) => `<td class="${row[k] ? "" : "muted"}">${fmt(row[k])}</td>`).join("")}
@@ -924,7 +925,7 @@ function renderDetail() {
   const line = (label, d, extra = "") => d ? `<div class="row"><span>${label}</span><span>${fmt(d.views)} views${extra}
       ${d.url && /^https:\/\//.test(d.url) ? ` · <a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">open ↗</a>` : ""}</span></div>` : "";
   const cms = commentList(n);
-  $("detailStats").innerHTML = `<p class="note">“${esc(c.caption)}”${c.format ? ` · ${c.format} video` : ""}</p>` +
+  $("detailStats").innerHTML = `<p class="note">“${esc(c.caption)}”</p>` +
     PLAT.map(p => {
       const d = c[p.k]; if (!d) return "";
       const bits = [d.reach != null ? `reach ${fmt(d.reach)}` : "", inter(d) ? ENG.filter(([k]) => d[k]).map(([k, l, ic]) => `${ic} ${fmt(d[k])}`).join(" ") : "",
