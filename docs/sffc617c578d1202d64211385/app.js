@@ -836,6 +836,8 @@ function spark(values) {
     <polyline points="${pts.join(" ")}" fill="none" stroke="var(--text-secondary)" stroke-width="1.5" stroke-linejoin="round"/>
     <circle cx="${pts[pts.length - 1].split(",")[0]}" cy="${pts[pts.length - 1].split(",")[1]}" r="2.5" fill="var(--accent)"/></svg>`;
 }
+// is cartoon n live on dashboard column k? From links.json via stats.py (DATA.posted, card #88, 2026-11-10)
+const posted = (n, k) => ((DATA && DATA.posted || {})[String(n)] || []).includes(k);
 function renderBoard() {
   const r = inRange(), now = latest(), ps = on();
   const past = snaps().filter(s => t(s) <= t(now) - 864e5), day = past.length ? past[past.length - 1] : null;
@@ -844,7 +846,8 @@ function renderBoard() {
     ENG.forEach(([k]) => { row[k] = eng(c, k); });
     row.rate = rate(c); row.tw = watch(c, "tiktok"); row.rw = watch(c, "instagram_reel");
     row.tc = c.tiktok && c.tiktok.completion_pct != null ? c.tiktok.completion_pct : null;
-    ps.forEach(p => { row[p.k] = c[p.k] ? c[p.k].views : null; });
+    // posted but not read yet (X every 3 h, LinkedIn every 4 h) shows 0; "–" only where it was never posted (card #88)
+    ps.forEach(p => { row[p.k] = c[p.k] ? c[p.k].views : posted(n, p.k) ? 0 : null; });
     // views since the same time yesterday (user, 2026-11-03), not since the start of the shown range
     row.change = !day ? null : day.cartoons[n] ? row.total - cartoonViews(day.cartoons[n]) : row.total;   // posted within the day: all of it
     row.trend = r.map(s => s.cartoons[n] ? cartoonViews(s.cartoons[n]) : 0);
@@ -927,7 +930,7 @@ function renderDetail() {
   const cms = commentList(n);
   $("detailStats").innerHTML = `<p class="note">“${esc(c.caption)}”</p>` +
     PLAT.map(p => {
-      const d = c[p.k]; if (!d) return "";
+      const d = c[p.k]; if (!d) return posted(n, p.k) ? line(iconHtml(p), {views: 0}, ` <span class="muted">· posted, not read yet</span>`) : "";
       const bits = [d.reach != null ? `reach ${fmt(d.reach)}` : "", inter(d) ? ENG.filter(([k]) => d[k]).map(([k, l, ic]) => `${ic} ${fmt(d[k])}`).join(" ") : "",
                     d.avg_watch_s ? `watch ${fmt(Math.min(d.avg_watch_s, 999), 1)} s` : "",
                     d.completion_pct != null ? `${fmt(d.completion_pct, 1)}% watched to the end` : "",
