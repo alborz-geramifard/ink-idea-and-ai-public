@@ -770,12 +770,15 @@ function renderEngTrend() {
   zoomUX("cEngTrend");
 }
 
+const TOP_N = 15;   // Performance per Cartoon shows this many bars; the Cartoons table shows this many rows before scrolling (card #139)
 function renderEngPosts() {
   const total = c => ENG.reduce((a, [k]) => a + eng(c, k), 0);
   const key = perfSort() === "views" ? cartoonViews : total;   // the "Sort by" chips (user, 2026-11-07)
-  const cs = Object.entries(latest().cartoons).sort((a, b) => key(b[1]) - key(a[1]) || +a[0] - +b[0]),   // highest first
+  const all = Object.entries(latest().cartoons).sort((a, b) => key(b[1]) - key(a[1]) || +a[0] - +b[0]),   // highest first
+        cs = all.slice(0, TOP_N),   // only the top 15 by the chosen sort, so the chart stays readable as cartoons pile up (card #139)
         o = base(), surface = css("--surface-1");
   const any = cs.some(([, c]) => ENG.some(([k]) => eng(c, k)));
+  $("perfCount").textContent = all.length > TOP_N ? `top ${TOP_N} of ${all.length}` : "";
   chart("cEngPosts").setOption({
     ...o, legend: {show: false}, grid: {...o.grid, top: 16},   // no legend: the hover box names each part
     tooltip: {...o.tooltip, trigger: "item",   // the views bar shows views; the stack shows its engagement
@@ -877,6 +880,8 @@ function renderBoard() {
       <td>${row.rate == null ? "–" : fmt(row.rate, 1) + "%"}</td><td>${row.tw == null ? "–" : fmt(row.tw, 1) + " s"}</td>
       <td>${row.tc == null ? "–" : fmt(row.tc, 1) + "%"}</td><td>${row.rw == null ? "–" : fmt(row.rw, 1) + " s"}</td>
       <td>${spark(row.trend)}</td></tr>`).join("") + "</tbody>";
+  $("boardCount").textContent = rows.length > TOP_N ? `top ${TOP_N} of ${rows.length} · scroll for the rest` : "";
+  fitBoard();
   $("board").querySelector("thead").onclick = e => {
     const th = e.target.closest("th[data-k]"); if (!th) return;
     const k = th.dataset.k;
@@ -890,6 +895,15 @@ function renderBoard() {
     if (state.sel) $("detail").scrollIntoView({behavior: "smooth", block: "nearest"});
   };
 }
+
+// the table box is as tall as its header plus the first TOP_N rows; the rest scroll inside it, header pinned (card #139)
+function fitBoard() {
+  const box = $("board").parentElement, trs = $("board").querySelectorAll("tbody tr");
+  if (trs.length <= TOP_N) { box.style.maxHeight = "none"; return; }
+  const last = trs[TOP_N - 1], h = last.offsetTop + last.offsetHeight;
+  box.style.maxHeight = h > 0 ? `${h + 1}px` : "";
+}
+addEventListener("resize", () => { if (DATA && !$("socialView").hidden) fitBoard(); });
 
 function renderDetail() {
   const n = state.sel, c = n && latest().cartoons[n];
