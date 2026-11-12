@@ -108,6 +108,10 @@ main { max-width: 1240px; margin: 0 auto; padding: 20px 16px 40px; }
 @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } .chart { height: 280px; } }
 
 .scroll { overflow-x: auto; }
+/* Cartoons table: first 15 rows show, the rest scroll inside; header stays pinned (card #139). Height set by fitBoard() */
+.board-box { overflow-y: auto; max-height: 820px; overscroll-behavior: contain; }
+.board-box .board thead th { position: sticky; top: 0; z-index: 2; background: var(--surface-1); box-shadow: inset 0 -1px var(--grid); }   /* the collapsed border scrolls away, the shadow stays */
+.board-box .board thead th:first-child { z-index: 3; }   /* phones: above the pinned cartoon column */
 .board { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
 .board th, .board td { padding: 9px 8px; border-bottom: 1px solid var(--grid); text-align: right; white-space: nowrap; }
 .board th:first-child, .board td:first-child { text-align: left; white-space: normal; min-width: 170px; }
