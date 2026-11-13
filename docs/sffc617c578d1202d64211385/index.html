@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=4">
 <link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png?v=4">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=4">
-<link rel="stylesheet" href="dash.css?v=35">
+<link rel="stylesheet" href="dash.css?v=36">
 </head>
 <body>
 <!-- Sign in: the page holds no data; data.json is AES-256-GCM, key = PBKDF2(username + password) -->
@@ -32,7 +32,7 @@
     <div class="brand"><img src="logo.png" alt="" class="logo sm"><div><h1>Ink Stats</h1><p class="muted" id="updated"></p></div></div>
     <div class="controls" role="toolbar" aria-label="Filters">
       <div class="seg" id="tab" role="tablist" aria-label="View">
-        <button data-t="social" class="on" role="tab">Social</button><button data-t="web" role="tab">Website</button><button data-t="schedule" role="tab">Schedule</button>
+        <button data-t="social" class="on" role="tab">Social</button><button data-t="web" role="tab">Website</button><button data-t="schedule" role="tab">Schedule</button><button data-t="timeline" role="tab">Timeline</button>
       </div>
       <div class="seg" id="range" role="radiogroup" aria-label="Time range">
         <button data-r="1">24 h</button><button data-r="7">7 d</button><button data-r="30">30 d</button><button data-r="0" class="on">All</button>
@@ -125,10 +125,26 @@
     <p class="muted empty" id="schedEmpty" hidden>Nothing in the queue. Approve cartoons from Suggestions/ to fill it.</p>
   </div>
 
+  <!-- Timeline (card #155): the queued videos on a dated line; hover a thumbnail for the big picture -->
+  <div id="tlView" hidden>
+    <section class="card tl-card-box" aria-label="Scheduled videos timeline">
+      <div class="tl-head">
+        <div class="tl-next" id="tlNext"></div>
+        <div class="tl-facts" id="tlFacts"></div>
+      </div>
+      <div class="tl-wrap" id="tlWrap">
+        <button class="tl-arrow prev" id="tlPrev" aria-label="Earlier">&#8249;</button>
+        <div class="tl-scroll" id="tlScroll" tabindex="0" aria-label="Timeline, scroll sideways"><div class="tl-track" id="timeline"></div></div>
+        <button class="tl-arrow next" id="tlNextBtn" aria-label="Later">&#8250;</button>
+      </div>
+    </section>
+    <p class="muted empty" id="tlEmpty" hidden>No videos in the queue yet. Approve a living video to see it here.</p>
+  </div>
+
   <footer class="muted">Refreshed every 10 minutes and whenever this page opens (X every 3 h) · data encrypted end to end · stays signed in for 1 day on this browser</footer>
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
-<script src="app.js?v=88"></script>
+<script src="app.js?v=89"></script>
 </body>
 </html>
