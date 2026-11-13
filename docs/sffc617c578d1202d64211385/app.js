@@ -165,7 +165,7 @@ const LOCAL = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
   try {
     const blob = await loadBlob();
     if (blob.salt !== s.salt) throw new Error("password changed");
-    const key = await crypto.subtle.importKey("raw", b64(s.k), {name: "AES-GCM"}, false, ["decrypt"]);
+    const key = await crypto.subtle.importKey("raw", b64(s.k), {name: "AES-GCM"}, false, ["encrypt", "decrypt"]);
     DATA = await decrypt(key, blob);
     KEY = key; IV = blob.iv;
     start();
@@ -192,7 +192,7 @@ $("loginForm").addEventListener("submit", async e => {
   try {
     const base = await crypto.subtle.importKey("raw", enc.encode($("user").value.trim() + "\n" + $("pass").value), "PBKDF2", false, ["deriveKey"]);
     key = await crypto.subtle.deriveKey({name: "PBKDF2", hash: "SHA-256", salt: b64(blob.salt), iterations: blob.iter},
-                                        base, {name: "AES-GCM", length: 256}, true, ["decrypt"]);
+                                        base, {name: "AES-GCM", length: 256}, true, ["encrypt", "decrypt"]);
     DATA = await decrypt(key, blob);
     KEY = key; IV = blob.iv;
   } catch (err) {
@@ -1020,11 +1020,85 @@ function untilText(ms) {
   const m = Math.round(ms / 6e4), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mm = m % 60;
   return d ? `in ${d} d ${h} h` : h ? `in ${h} h ${mm} m` : `in ${mm} min`;
 }
+// Reorder (card #161): "Change order" turns the line into drag and drop (‹ › buttons on touch screens). The dates stay
+// where they are; the cartoons move between them and take the slot's number. Nothing is sent until Save: the live page
+// seals {from, to, at} with the dashboard key and hands it to the Worker (POST /queue); the Mac applies it within
+// ~30 s (queue_reorder.apply_pending) and publishes fresh data. The local page posts it to Scripts/dashboard_local.py.
+const QUEUE_URL = "https://ink-analytics.inkideaandai.workers.dev/queue";
+const TL = {edit: false, order: null, drag: null, pending: null, note: "", bad: false, busy: false};
+const tlTitles = () => ((DATA.schedule && DATA.schedule.upcoming) || []).map(o => o.title);
+const sameList = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+function tlNote(text, bad = false) { TL.note = text; TL.bad = bad; }
+function tlSettle() {   // fresh data in: did the Mac apply our Save (or refuse it)?
+  const p = TL.pending, r = DATA.schedule && DATA.schedule.reorder;
+  if (!p) return;
+  if (r && r.at === p.at) { tlNote(r.msg, !r.ok); TL.pending = null; return; }
+  if (sameList(tlTitles(), p.to)) { tlNote("Saved: the new order is live."); TL.pending = null; return; }
+  if (!sameList(tlTitles(), p.from)) { tlNote("The queue changed meanwhile; check the order below.", true); TL.pending = null; }
+}
+async function tlSave() {
+  const from = tlTitles(), to = TL.order.slice(), at = Date.now();
+  if (sameList(from, to)) { TL.edit = false; tlNote(""); renderTimeline(); return; }
+  TL.busy = true; tlNote("Saving…"); renderTimeline();
+  try {
+    if (LOCAL) {
+      const r = await fetch("queue", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({from, to, at})});
+      if (!(r.headers.get("Content-Type") || "").includes("json"))
+        throw new Error("saving needs the local server: python3 Scripts/dashboard_local.py");
+      const res = await r.json();
+      const d = await fetch("local-data.json?t=" + Date.now(), {cache: "no-store"});
+      if (d.ok) DATA = await d.json();
+      TL.edit = !res.ok; tlNote(res.msg, !res.ok);
+      if (!res.ok) TL.order = tlTitles();
+    } else {
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ct = await crypto.subtle.encrypt({name: "AES-GCM", iv, additionalData: enc.encode("ink-queue-v1")}, KEY,
+                                             enc.encode(JSON.stringify({from, to, at})));
+      const r = await fetch(QUEUE_URL, {method: "POST", headers: {"Content-Type": "text/plain"},
+                                        body: JSON.stringify({v: 1, iv: toB64(iv), ct: toB64(ct)})});
+      if (r.status !== 204) throw new Error(`the Worker said ${r.status}`);   // an old Worker answers 200 "ok": not saved
+      TL.edit = false; TL.pending = {from, to, at};
+      tlNote("Saved. The Mac puts it in the queue within a minute…");
+    }
+  } catch (e) {
+    tlNote(`Couldn't save (${e.message || e}). Your order is still here; try again.`, true);
+  }
+  TL.busy = false;
+  renderAll();
+  if (TL.pending) {
+    await askFresh();
+    if (TL.pending && DATA) {   // no answer yet: the row waits in the Worker for the Mac's next run
+      tlNote("Sent, but the Mac hasn't applied it yet (asleep?). It goes in on its next run.", true); renderAll();
+    }
+  }
+}
+function tlMove(title, to) {
+  const o = TL.order, from = o.indexOf(title);
+  if (from < 0 || to < 0 || to >= o.length || to === from) return;
+  o.splice(from, 1); o.splice(to, 0, title);
+  renderTimeline();
+}
 function renderTimeline() {
-  const S = DATA.schedule, up = (S && S.upcoming) || [], vids = up.filter(o => o.video);
+  const S = DATA.schedule, up = (S && S.upcoming) || [];
+  tlSettle();
+  if (TL.edit && (!TL.order || !sameList([...TL.order].sort(), tlTitles().sort()))) TL.order = tlTitles();   // the queue changed under us
+  const byTitle = Object.fromEntries(up.map(o => [o.title, o]));
+  const order = TL.edit ? TL.order : TL.pending ? TL.pending.to : tlTitles();
+  // the slots (date, number) stay; the cartoons fill them in the shown order
+  const list = order.map((t, i) => ({...byTitle[t], date: up[i].date, n: up[0].n + i, was: byTitle[t].n}));
+  const vids = list.filter(o => o.video), changed = TL.edit && !sameList(TL.order, tlTitles());
   $("tlEmpty").hidden = !!vids.length;
   $("tlView").querySelector(".tl-card-box").hidden = !vids.length;
   if (!vids.length) return;
+  $("tlEdit").innerHTML = (TL.edit
+    ? `<span class="tl-edit-hint">Drag the pictures into the order you want (or use ‹ ›); the dates stay put. Nothing changes until you save.</span>
+       <button class="tl-btn" id="tlCancel" ${TL.busy ? "disabled" : ""}>Cancel</button>
+       <button class="tl-btn primary" id="tlSave" ${changed && !TL.busy ? "" : "disabled"}>Save order</button>`
+    : `<button class="tl-btn" id="tlStart" ${TL.pending ? "disabled" : ""}>⇄ Change order</button>`) +
+    (TL.note ? `<span class="tl-note${TL.bad ? " bad" : ""}" role="status">${esc(TL.note)}</span>` : "");
+  if ($("tlStart")) $("tlStart").onclick = () => { TL.edit = true; TL.order = tlTitles(); tlNote(""); renderTimeline(); };
+  if ($("tlCancel")) $("tlCancel").onclick = () => { TL.edit = false; TL.order = null; tlNote(""); renderTimeline(); };
+  if ($("tlSave")) $("tlSave").onclick = tlSave;
   const today = new Date(new Date().toDateString());
   const dayDiff = d => Math.round((new Date(new Date(d).toDateString()) - today) / 864e5);
   const rel = k => k === 0 ? "Tonight" : k === 1 ? "Tomorrow" : k > 1 ? `in ${k} days` : "";
@@ -1046,24 +1120,32 @@ function renderTimeline() {
   let html = `<div class="tl-now" title="Today"><span class="tl-now-dot"></span><span class="tl-now-l">Now</span>
     <span class="tl-now-d">${esc(today.toLocaleDateString([], {month: "short", day: "numeric"}))}</span></div>`;
   let month = null, k = 0;
-  up.forEach(o => {
+  list.forEach((o, i) => {
     const d = new Date(o.date), when = longDay(o.date), hour = hourText(d.getHours());
     if (d.getMonth() !== month) {
       month = d.getMonth();
       html += `<div class="tl-month"><span>${esc(d.toLocaleDateString([], {month: "long"}))}</span></div>`;
     }
-    const kd = dayDiff(o.date), cls = [o === first ? "next" : "", [0, 6].includes(d.getDay()) ? "weekend" : "", o.video ? "" : "img-only"].join(" ");
+    const moved = (TL.edit || TL.pending) && o.was !== o.n;
+    const kd = dayDiff(o.date), cls = [o === first ? "next" : "", [0, 6].includes(d.getDay()) ? "weekend" : "",
+                                       o.video ? "" : "img-only", moved ? "moved" : ""].join(" ");
     const card = o.video
-      ? `<img class="thumb tl-img" src="${o.big || o.thumb}" data-big="${o.big || o.thumb}" alt="No. ${esc(o.n)} ${esc(o.title)}"
+      ? `<img class="thumb tl-img" src="${o.big || o.thumb}" data-big="${o.big || o.thumb}" alt="No. ${esc(o.n)} ${esc(o.title)}" draggable="false"
            data-cap="${esc(`No. ${o.n} · ${o.title}`)}" data-when="${esc(`${when} · ${hour}`)}">${num(o.n, "tl-n")}`
-      : `<span class="tl-ghost" title="${esc(`No. ${o.n} ${o.title}: image post, no video`)}">image<br>post</span>`;
-    html += `<div class="tl-item ${cls}" style="--i:${k++}">
-      <div class="tl-card">${card}</div><div class="tl-stem"></div><div class="tl-node"></div>
+      : `<span class="tl-ghost" title="${esc(`No. ${o.n} ${o.title}: image post, no video`)}">image<br>post${TL.edit ? `<small>${esc(o.title)}</small>` : ""}</span>`;
+    const arrows = TL.edit ? `<div class="tl-move"><button data-mv="-1" aria-label="Earlier" ${i ? "" : "disabled"}>‹</button>` +
+                             `<button data-mv="1" aria-label="Later" ${i < list.length - 1 ? "" : "disabled"}>›</button></div>` : "";
+    html += `<div class="tl-item ${cls}" style="--i:${k++}" data-t="${esc(o.title)}"${TL.edit ? ' draggable="true"' : ""}>
+      <div class="tl-card">${card}${arrows}</div><div class="tl-stem"></div><div class="tl-node"></div>
       <div class="tl-date"><span class="tl-wd">${esc(d.toLocaleDateString([], {weekday: "short"}))}</span>
         <span class="tl-day">${d.getDate()}</span><span class="tl-mo">${esc(d.toLocaleDateString([], {month: "short"}))}</span>
-        ${kd <= 1 ? `<span class="tl-rel">${esc(rel(kd))}</span>` : ""}</div></div>`;
+        ${kd <= 1 ? `<span class="tl-rel">${esc(rel(kd))}</span>` : ""}
+        ${moved ? `<span class="tl-was">was No. ${esc(o.was)}</span>` : ""}</div></div>`;
   });
-  $("timeline").innerHTML = html;
+  const track = $("timeline");
+  track.innerHTML = html;
+  track.classList.toggle("editing", TL.edit);
+  track.classList.toggle("pending", !!TL.pending);
   const sc = $("tlScroll");
   if (!sc.dataset.wired) {   // wheel scrolls sideways; arrows page through; arrows hide at the ends
     sc.dataset.wired = "1";
@@ -1081,6 +1163,47 @@ function renderTimeline() {
     };
     sc.addEventListener("scroll", ends, {passive: true}); addEventListener("resize", ends);
     renderTimeline.ends = ends;
+    // drag and drop (edit mode): drop before or after the item under the pointer; the line scrolls near its edges
+    const item = e => e.target.closest && e.target.closest(".tl-item[data-t]");
+    const clearMarks = () => track.querySelectorAll(".drop-before, .drop-after").forEach(x => x.classList.remove("drop-before", "drop-after"));
+    track.addEventListener("dragstart", e => {
+      const it = item(e);
+      if (!TL.edit || !it) return;
+      TL.drag = it.dataset.t; it.classList.add("dragging");
+      hovering = null; preview.hidden = true; zoomCap.hidden = true;
+      e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", TL.drag);
+    });
+    track.addEventListener("dragend", () => { TL.drag = null; clearMarks(); track.querySelectorAll(".dragging").forEach(x => x.classList.remove("dragging")); });
+    track.addEventListener("dragover", e => {
+      if (!TL.drag) return;
+      e.preventDefault(); e.dataTransfer.dropEffect = "move";
+      const r = sc.getBoundingClientRect(), edge = 70;
+      if (e.clientX < r.left + edge) sc.scrollLeft -= 14; else if (e.clientX > r.right - edge) sc.scrollLeft += 14;
+      const it = item(e);
+      clearMarks();
+      if (!it || it.dataset.t === TL.drag) return;
+      const b = it.getBoundingClientRect();
+      it.classList.add(e.clientX < b.left + b.width / 2 ? "drop-before" : "drop-after");
+    });
+    track.addEventListener("drop", e => {
+      if (!TL.drag) return;
+      e.preventDefault();
+      const it = item(e), t = TL.drag;
+      TL.drag = null;
+      if (!it || it.dataset.t === t) { clearMarks(); return; }
+      const b = it.getBoundingClientRect(), after = e.clientX >= b.left + b.width / 2;
+      const o = TL.order.filter(x => x !== t);
+      o.splice(o.indexOf(it.dataset.t) + (after ? 1 : 0), 0, t);
+      TL.order = o;
+      renderTimeline();
+    });
+    track.addEventListener("click", e => {   // ‹ › one step earlier / later (touch screens, keyboard)
+      const btn = e.target.closest && e.target.closest("[data-mv]"), it = btn && item(e);
+      if (!TL.edit || !it) return;
+      tlMove(it.dataset.t, TL.order.indexOf(it.dataset.t) + +btn.dataset.mv);
+      const again = track.querySelector(`.tl-item[data-t="${CSS.escape(it.dataset.t)}"] [data-mv="${btn.dataset.mv}"]`);
+      if (again && !again.disabled) again.focus();
+    });
   }
   requestAnimationFrame(renderTimeline.ends);
 }
