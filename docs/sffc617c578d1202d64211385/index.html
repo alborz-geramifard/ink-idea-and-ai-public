@@ -32,7 +32,7 @@
     <div class="brand"><img src="logo.png" alt="" class="logo sm"><div><h1>Ink Stats</h1><p class="muted" id="updated"></p></div></div>
     <div class="controls" role="toolbar" aria-label="Filters">
       <div class="seg" id="tab" role="tablist" aria-label="View">
-        <button data-t="social" class="on" role="tab">Social</button><button data-t="web" role="tab">Website</button><button data-t="schedule" role="tab">Schedule</button><button data-t="timeline" role="tab">Timeline</button>
+        <button data-t="social" class="on" role="tab">Social</button><button data-t="web" role="tab">Website</button><button data-t="timeline" role="tab">Timeline</button>
       </div>
       <div class="seg" id="range" role="radiogroup" aria-label="Time range">
         <button data-r="1">24 h</button><button data-r="7">7 d</button><button data-r="30">30 d</button><button data-r="0" class="on">All</button>
@@ -115,14 +115,6 @@
       <article class="card"><div class="card-h"><h2>Devices</h2></div><div class="chart" id="webDevices"></div></article>
     </section>
     <p class="muted empty" id="webEmpty" hidden>No website visits recorded yet. The counter starts once it is set up and the site is published.</p>
-  </div>
-
-  <div id="schedView" hidden>
-    <section class="card" aria-label="Posting schedule">
-      <div class="card-h"><h2>Schedule</h2><span class="note" id="schedNote"></span></div>
-      <div id="schedule" class="sched"></div>
-    </section>
-    <p class="muted empty" id="schedEmpty" hidden>Nothing in the queue. Approve cartoons from Suggestions/ to fill it.</p>
   </div>
 
   <!-- Timeline (card #155): the queued videos on a dated line; hover a thumbnail for the big picture -->
