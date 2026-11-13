@@ -301,6 +301,9 @@ const thumb = (n, cls = "thumb") => `<img src="thumbs/${+n}.jpg" data-big="thumb
 const preview = document.createElement("img");
 preview.className = "ink-zoom"; preview.alt = ""; preview.hidden = true;
 document.body.appendChild(preview);
+const zoomCap = document.createElement("div");   // title + date under the big picture (Timeline tab, card #155)
+zoomCap.className = "ink-zoom-cap"; zoomCap.hidden = true;
+document.body.appendChild(zoomCap);
 const bigCache = {};
 function preloadBig() {
   document.querySelectorAll("img.thumb").forEach(t => {
@@ -322,10 +325,12 @@ document.addEventListener("mouseover", e => {
     im.addEventListener("load", () => { if (hovering === t) preview.src = im.src; }, {once: true});
   }
   preview.hidden = false;
+  zoomCap.hidden = !t.dataset.cap;
+  if (t.dataset.cap) zoomCap.innerHTML = `<b>${esc(t.dataset.cap)}</b><span>${esc(t.dataset.when || "")}</span>`;
 });
 document.addEventListener("mouseout", e => {
   const t = e.target.closest && e.target.closest("img.thumb");
-  if (t && !(e.relatedTarget && t.contains(e.relatedTarget))) { hovering = null; preview.hidden = true; }
+  if (t && !(e.relatedTarget && t.contains(e.relatedTarget))) { hovering = null; preview.hidden = true; zoomCap.hidden = true; }
 });
 document.addEventListener("mousemove", e => {
   if (preview.hidden) return;
@@ -334,6 +339,7 @@ document.addEventListener("mousemove", e => {
   if (x + w > innerWidth - 8) x = e.clientX - w - pad;
   y = Math.max(8, Math.min(y, innerHeight - h - 8));
   preview.style.left = x + "px"; preview.style.top = y + "px";
+  if (!zoomCap.hidden) { zoomCap.style.left = x + "px"; zoomCap.style.top = (y + h) + "px"; zoomCap.style.width = w + "px"; }
 });
 
 function reelWatch(s) {   // median Instagram (Reel) watch time; > 60 s is a looping outlier, not real watching
@@ -995,11 +1001,12 @@ function renderAll() {
   $("updated").textContent = `Updated ${new Date(now.updated).toLocaleString([], {dateStyle: "medium", timeStyle: "short"})}` +
     ` · ${snaps().length} snapshot${snaps().length === 1 ? "" : "s"} since ${new Date(snaps()[0].updated).toLocaleDateString([], {month: "short", day: "numeric"})}` +
     (errs.length ? ` · couldn't refresh: ${errs.join(", ")}` : "") + (REFRESH ? ` · ${REFRESH}` : "");
-  const web = state.tab === "web", sched = state.tab === "schedule";
+  const web = state.tab === "web", sched = state.tab === "schedule", tl = state.tab === "timeline";
   document.querySelectorAll("#tab button").forEach(b => b.classList.toggle("on", b.dataset.t === state.tab));
-  $("socialView").hidden = web || sched; $("webView").hidden = !web; $("schedView").hidden = !sched;
-  $("range").hidden = sched;   // the schedule has no time range
+  $("socialView").hidden = web || sched || tl; $("webView").hidden = !web; $("schedView").hidden = !sched; $("tlView").hidden = !tl;
+  $("range").hidden = sched || tl;   // the schedule and the timeline have no time range
   if (sched) { renderSchedule(); return; }
+  if (tl) { renderTimeline(); return; }
   fitCharts();   // charts sized while their tab was hidden come back squeezed (ECharts falls back to 100 px)
   if (web) { renderWeb(); return; }
   renderChanges(); renderTiles(); renderTrend(); renderAge(); renderEngTrend(); renderEngPosts(); renderMix(); renderBoard(); renderDetail(); renderComments();
@@ -1030,6 +1037,79 @@ function renderSchedule() {
     (up.length ? `<div class="sched-h">Coming up · ${up.length} in the queue, the last on ${esc(last)}</div>${next}` : "");
   $("schedNote").textContent = S ? `one cartoon every ${S.every_days === 1 ? "day" : S.every_days + " days"} at ` +
     `${S.hour > 12 ? S.hour - 12 + " pm" : S.hour + " am"} · dates are projected from the last post` : "";
+}
+
+// ---- timeline tab (card #155): the queued videos on a dated line, thumbnails only; hover one for the big picture.
+// Image-only cartoons keep their slot as a small hollow dot so every date stays where it really is.
+const hourText = h => h === 0 ? "12 am" : h < 12 ? `${h} am` : h === 12 ? "12 pm" : `${h - 12} pm`;
+function untilText(ms) {
+  if (ms <= 0) return "going out now";
+  const m = Math.round(ms / 6e4), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mm = m % 60;
+  return d ? `in ${d} d ${h} h` : h ? `in ${h} h ${mm} m` : `in ${mm} min`;
+}
+function renderTimeline() {
+  const S = DATA.schedule, up = (S && S.upcoming) || [], vids = up.filter(o => o.video);
+  $("tlEmpty").hidden = !!vids.length;
+  $("tlView").querySelector(".tl-card-box").hidden = !vids.length;
+  if (!vids.length) return;
+  const today = new Date(new Date().toDateString());
+  const dayDiff = d => Math.round((new Date(new Date(d).toDateString()) - today) / 864e5);
+  const rel = k => k === 0 ? "Tonight" : k === 1 ? "Tomorrow" : k > 1 ? `in ${k} days` : "";
+  const first = vids[0], last = vids[vids.length - 1];
+  const longDay = d => new Date(d).toLocaleDateString([], {weekday: "short", month: "short", day: "numeric"});
+  const tick = () => {
+    $("tlNext").innerHTML = `<img src="${first.big || first.thumb}" alt="" class="tl-next-img">
+      <div><div class="tl-kicker">Next video</div><div class="tl-next-t">${num(first.n)} ${esc(first.title)}</div>
+      <div class="tl-next-when"><b>${esc(untilText(new Date(first.date) - Date.now()))}</b> · ${esc(longDay(first.date))}, ${esc(hourText(new Date(first.date).getHours()))}</div></div>`;
+  };
+  tick();
+  clearInterval(renderTimeline.timer);
+  renderTimeline.timer = setInterval(() => { if (state.tab === "timeline") tick(); else clearInterval(renderTimeline.timer); }, 30e3);
+  const every = S.every_days === 1 ? "every day" : `every ${S.every_days} days`;
+  $("tlFacts").innerHTML = `<div class="tl-fact"><b>${vids.length}</b><span>video${vids.length === 1 ? "" : "s"} queued</span></div>
+    <div class="tl-fact"><b>${esc(new Date(last.date).toLocaleDateString([], {month: "short", day: "numeric"}))}</b><span>last one</span></div>
+    <div class="tl-fact"><b>${esc(hourText(S.hour))}</b><span>${esc(every)}</span></div>`;
+
+  let html = `<div class="tl-now" title="Today"><span class="tl-now-dot"></span><span class="tl-now-l">Now</span>
+    <span class="tl-now-d">${esc(today.toLocaleDateString([], {month: "short", day: "numeric"}))}</span></div>`;
+  let month = null, k = 0;
+  up.forEach(o => {
+    const d = new Date(o.date), when = longDay(o.date), hour = hourText(d.getHours());
+    if (d.getMonth() !== month) {
+      month = d.getMonth();
+      html += `<div class="tl-month"><span>${esc(d.toLocaleDateString([], {month: "long"}))}</span></div>`;
+    }
+    const kd = dayDiff(o.date), cls = [o === first ? "next" : "", [0, 6].includes(d.getDay()) ? "weekend" : "", o.video ? "" : "img-only"].join(" ");
+    const card = o.video
+      ? `<img class="thumb tl-img" src="${o.big || o.thumb}" data-big="${o.big || o.thumb}" alt="No. ${esc(o.n)} ${esc(o.title)}"
+           data-cap="${esc(`No. ${o.n} · ${o.title}`)}" data-when="${esc(`${when} · ${hour}`)}">${num(o.n, "tl-n")}`
+      : `<span class="tl-ghost" title="${esc(`No. ${o.n} ${o.title}: image post, no video`)}">image<br>post</span>`;
+    html += `<div class="tl-item ${cls}" style="--i:${k++}">
+      <div class="tl-card">${card}</div><div class="tl-stem"></div><div class="tl-node"></div>
+      <div class="tl-date"><span class="tl-wd">${esc(d.toLocaleDateString([], {weekday: "short"}))}</span>
+        <span class="tl-day">${d.getDate()}</span><span class="tl-mo">${esc(d.toLocaleDateString([], {month: "short"}))}</span>
+        ${kd <= 1 ? `<span class="tl-rel">${esc(rel(kd))}</span>` : ""}</div></div>`;
+  });
+  $("timeline").innerHTML = html;
+  const sc = $("tlScroll");
+  if (!sc.dataset.wired) {   // wheel scrolls sideways; arrows page through; arrows hide at the ends
+    sc.dataset.wired = "1";
+    sc.addEventListener("wheel", e => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || sc.scrollWidth <= sc.clientWidth) return;
+      const end = e.deltaY > 0 ? sc.scrollLeft + sc.clientWidth >= sc.scrollWidth - 1 : sc.scrollLeft <= 0;
+      if (end) return;   // at either end the page scrolls on as usual
+      sc.scrollLeft += e.deltaY; e.preventDefault();
+    }, {passive: false});
+    const page = dir => sc.scrollBy({left: dir * sc.clientWidth * 0.8, behavior: "smooth"});
+    $("tlPrev").onclick = () => page(-1); $("tlNextBtn").onclick = () => page(1);
+    const ends = () => {
+      $("tlPrev").classList.toggle("off", sc.scrollLeft <= 2);
+      $("tlNextBtn").classList.toggle("off", sc.scrollLeft + sc.clientWidth >= sc.scrollWidth - 2);
+    };
+    sc.addEventListener("scroll", ends, {passive: true}); addEventListener("resize", ends);
+    renderTimeline.ends = ends;
+  }
+  requestAnimationFrame(renderTimeline.ends);
 }
 
 // ---- website tab (Cloudflare counter: per-day rows from analytics.report) -------------
