@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=4">
 <link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png?v=4">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=4">
-<link rel="stylesheet" href="dash.css?v=34">
+<link rel="stylesheet" href="dash.css?v=35">
 </head>
 <body>
 <!-- Sign in: the page holds no data; data.json is AES-256-GCM, key = PBKDF2(username + password) -->
@@ -32,7 +32,7 @@
     <div class="brand"><img src="logo.png" alt="" class="logo sm"><div><h1>Ink Stats</h1><p class="muted" id="updated"></p></div></div>
     <div class="controls" role="toolbar" aria-label="Filters">
       <div class="seg" id="tab" role="tablist" aria-label="View">
-        <button data-t="social" class="on" role="tab">Social</button><button data-t="web" role="tab">Website</button>
+        <button data-t="social" class="on" role="tab">Social</button><button data-t="web" role="tab">Website</button><button data-t="schedule" role="tab">Schedule</button>
       </div>
       <div class="seg" id="range" role="radiogroup" aria-label="Time range">
         <button data-r="1">24 h</button><button data-r="7">7 d</button><button data-r="30">30 d</button><button data-r="0" class="on">All</button>
@@ -117,10 +117,18 @@
     <p class="muted empty" id="webEmpty" hidden>No website visits recorded yet. The counter starts once it is set up and the site is published.</p>
   </div>
 
+  <div id="schedView" hidden>
+    <section class="card" aria-label="Posting schedule">
+      <div class="card-h"><h2>Schedule</h2><span class="note" id="schedNote"></span></div>
+      <div id="schedule" class="sched"></div>
+    </section>
+    <p class="muted empty" id="schedEmpty" hidden>Nothing in the queue. Approve cartoons from Suggestions/ to fill it.</p>
+  </div>
+
   <footer class="muted">Refreshed every 10 minutes and whenever this page opens (X every 3 h) · data encrypted end to end · stays signed in for 1 day on this browser</footer>
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
-<script src="app.js?v=87"></script>
+<script src="app.js?v=88"></script>
 </body>
 </html>
