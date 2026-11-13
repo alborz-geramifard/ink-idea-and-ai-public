@@ -1030,7 +1030,12 @@ function renderSchedule() {
   const recent = Object.entries(latest().cartoons).filter(([, c]) => postedAt(c))
     .sort((a, b) => +b[0] - +a[0]).slice(0, 3).reverse()
     .map(([n, c]) => schedCard({n, title: c.title, date: postedAt(c), label: "posted", img: thumb(n, "thumb sc-img")}, "done")).join("");
-  const next = up.map((o, i) => schedCard({...o, label: i ? "" : rel(o.date), img: `<img src="${o.thumb}" alt="" loading="lazy">`,
+  const zoomImg = o => {   // hover zoom on every upcoming one (card #155), with its number, title and date
+    const d = new Date(o.date), when = `${d.toLocaleDateString([], DAY)} · ${d.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"})}`;
+    return `<img src="${o.thumb}" data-big="${o.big || o.thumb}" class="thumb" alt="" loading="lazy"
+      data-cap="${esc(`No. ${o.n} · ${o.title}`)}" data-when="${esc(when)}">`;
+  };
+  const next = up.map((o, i) => schedCard({...o, label: i ? "" : rel(o.date), img: zoomImg(o),
     tag: o.video ? "" : "image only"}, i ? "" : "next")).join("");
   const last = up.length ? new Date(up[up.length - 1].date).toLocaleDateString([], DAY) : "";
   $("schedule").innerHTML = (recent ? `<div class="sched-h">Recently posted</div>${recent}` : "") +
