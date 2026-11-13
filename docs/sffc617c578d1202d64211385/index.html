@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=4">
 <link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png?v=4">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=4">
-<link rel="stylesheet" href="dash.css?v=36">
+<link rel="stylesheet" href="dash.css?v=37">
 </head>
 <body>
 <!-- Sign in: the page holds no data; data.json is AES-256-GCM, key = PBKDF2(username + password) -->
@@ -117,13 +117,15 @@
     <p class="muted empty" id="webEmpty" hidden>No website visits recorded yet. The counter starts once it is set up and the site is published.</p>
   </div>
 
-  <!-- Timeline (card #155): the queued videos on a dated line; hover a thumbnail for the big picture -->
+  <!-- Timeline (card #155): the queued videos on a dated line; hover a thumbnail for the big picture.
+       "Change order" (card #161): drag them around; Save sends the new order to State/queue.yaml -->
   <div id="tlView" hidden>
     <section class="card tl-card-box" aria-label="Scheduled videos timeline">
       <div class="tl-head">
         <div class="tl-next" id="tlNext"></div>
         <div class="tl-facts" id="tlFacts"></div>
       </div>
+      <div class="tl-edit" id="tlEdit" aria-label="Posting order"></div>
       <div class="tl-wrap" id="tlWrap">
         <button class="tl-arrow prev" id="tlPrev" aria-label="Earlier">&#8249;</button>
         <div class="tl-scroll" id="tlScroll" tabindex="0" aria-label="Timeline, scroll sideways"><div class="tl-track" id="timeline"></div></div>
@@ -137,6 +139,6 @@
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
-<script src="app.js?v=90"></script>
+<script src="app.js?v=91"></script>
 </body>
 </html>
