@@ -1001,47 +1001,15 @@ function renderAll() {
   $("updated").textContent = `Updated ${new Date(now.updated).toLocaleString([], {dateStyle: "medium", timeStyle: "short"})}` +
     ` · ${snaps().length} snapshot${snaps().length === 1 ? "" : "s"} since ${new Date(snaps()[0].updated).toLocaleDateString([], {month: "short", day: "numeric"})}` +
     (errs.length ? ` · couldn't refresh: ${errs.join(", ")}` : "") + (REFRESH ? ` · ${REFRESH}` : "");
-  const web = state.tab === "web", sched = state.tab === "schedule", tl = state.tab === "timeline";
+  const web = state.tab === "web", tl = state.tab === "timeline";
   document.querySelectorAll("#tab button").forEach(b => b.classList.toggle("on", b.dataset.t === state.tab));
-  $("socialView").hidden = web || sched || tl; $("webView").hidden = !web; $("schedView").hidden = !sched; $("tlView").hidden = !tl;
-  $("range").hidden = sched || tl;   // the schedule and the timeline have no time range
-  if (sched) { renderSchedule(); return; }
+  $("socialView").hidden = web || tl; $("webView").hidden = !web; $("tlView").hidden = !tl;
+  $("range").hidden = tl;   // the timeline has no time range
   if (tl) { renderTimeline(); return; }
   fitCharts();   // charts sized while their tab was hidden come back squeezed (ECharts falls back to 100 px)
   if (web) { renderWeb(); return; }
   renderChanges(); renderTiles(); renderTrend(); renderAge(); renderEngTrend(); renderEngPosts(); renderMix(); renderBoard(); renderDetail(); renderComments();
   preloadBig();
-}
-
-// ---- schedule tab (card #148): the queue with projected dates (stats.schedule) + the last few posted ----------
-const DAY = {weekday: "short", month: "short", day: "numeric"};
-function schedCard(o, cls) {
-  const d = new Date(o.date);
-  const when = d.toLocaleDateString([], DAY), hour = d.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"});
-  return `<div class="sc ${cls}"><div class="sc-date"><span>${esc(when)}</span><span class="muted">${esc(o.label || hour)}</span></div>
-    ${o.img}<div class="sc-t">${num(o.n)}<span title="${esc(o.title)}">${esc(o.title)}</span></div>
-    ${o.hook ? `<div class="sc-hook">${esc(o.hook)}</div>` : ""}${o.tag ? `<div><span class="sc-tag">${esc(o.tag)}</span></div>` : ""}</div>`;
-}
-function renderSchedule() {
-  const S = DATA.schedule, up = (S && S.upcoming) || [];
-  $("schedEmpty").hidden = !!up.length;
-  const days = d => Math.round((new Date(new Date(d).toDateString()) - new Date(new Date().toDateString())) / 864e5);
-  const rel = d => { const k = days(d); return k === 0 ? "tonight" : k === 1 ? "tomorrow" : k > 1 ? `in ${k} days` : ""; };
-  const recent = Object.entries(latest().cartoons).filter(([, c]) => postedAt(c))
-    .sort((a, b) => +b[0] - +a[0]).slice(0, 3).reverse()
-    .map(([n, c]) => schedCard({n, title: c.title, date: postedAt(c), label: "posted", img: thumb(n, "thumb sc-img")}, "done")).join("");
-  const zoomImg = o => {   // hover zoom on every upcoming one (card #155), with its number, title and date
-    const d = new Date(o.date), when = `${d.toLocaleDateString([], DAY)} · ${d.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"})}`;
-    return `<img src="${o.thumb}" data-big="${o.big || o.thumb}" class="thumb" alt="" loading="lazy"
-      data-cap="${esc(`No. ${o.n} · ${o.title}`)}" data-when="${esc(when)}">`;
-  };
-  const next = up.map((o, i) => schedCard({...o, label: i ? "" : rel(o.date), img: zoomImg(o),
-    tag: o.video ? "" : "image only"}, i ? "" : "next")).join("");
-  const last = up.length ? new Date(up[up.length - 1].date).toLocaleDateString([], DAY) : "";
-  $("schedule").innerHTML = (recent ? `<div class="sched-h">Recently posted</div>${recent}` : "") +
-    (up.length ? `<div class="sched-h">Coming up · ${up.length} in the queue, the last on ${esc(last)}</div>${next}` : "");
-  $("schedNote").textContent = S ? `one cartoon every ${S.every_days === 1 ? "day" : S.every_days + " days"} at ` +
-    `${S.hour > 12 ? S.hour - 12 + " pm" : S.hour + " am"} · dates are projected from the last post` : "";
 }
 
 // ---- timeline tab (card #155): the queued videos on a dated line, thumbnails only; hover one for the big picture.
