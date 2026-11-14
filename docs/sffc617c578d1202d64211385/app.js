@@ -1081,6 +1081,39 @@ function tlMove(title, to) {
   o.splice(from, 1); o.splice(to, 0, title);
   renderTimeline();
 }
+// Holidays on the line (card #193): the main US shopping / posting days, worked out for any year (no list to keep up).
+function nthDay(y, m, wd, n) {   // n-th weekday wd (0 = Sun) of month m (0-based); n = -1 is the last one
+  if (n > 0) { const d = new Date(y, m, 1); return new Date(y, m, 1 + (wd - d.getDay() + 7) % 7 + (n - 1) * 7); }
+  const d = new Date(y, m + 1, 0); return new Date(y, m, d.getDate() - (d.getDay() - wd + 7) % 7);
+}
+function easter(y) {   // Gregorian Easter Sunday (anonymous algorithm)
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25),
+        g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4,
+        l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451), mo = Math.floor((h + l - 7 * m + 114) / 31);
+  return new Date(y, mo - 1, (h + l - 7 * m + 114) % 31 + 1);
+}
+function holidays(y) {   // [{date, name, icon}] for year y
+  const D = (m, d) => new Date(y, m, d), tg = nthDay(y, 10, 4, 4), ea = easter(y);
+  return [
+    [D(0, 1), "New Year's Day", "🎉"], [nthDay(y, 0, 1, 3), "MLK Day", "✊"], [D(1, 14), "Valentine's Day", "❤️"],
+    [nthDay(y, 1, 1, 3), "Presidents' Day", "🇺🇸"], [D(2, 17), "St. Patrick's Day", "☘️"], [D(3, 1), "April Fools'", "🃏"],
+    [ea, "Easter", "🐣"], [nthDay(y, 4, 0, 2), "Mother's Day", "💐"], [nthDay(y, 4, 1, -1), "Memorial Day", "🇺🇸"],
+    [nthDay(y, 5, 0, 3), "Father's Day", "👔"], [D(6, 4), "Independence Day", "🎆"], [nthDay(y, 8, 1, 1), "Labor Day", "🛠️"],
+    [D(9, 31), "Halloween", "🎃"], [tg, "Thanksgiving", "🦃"], [new Date(y, 10, tg.getDate() + 1), "Black Friday", "🛍️"],
+    [new Date(y, 10, tg.getDate() + 4), "Cyber Monday", "💻"], [D(11, 24), "Christmas Eve", "🎄"], [D(11, 25), "Christmas", "🎁"],
+    [D(11, 31), "New Year's Eve", "🥂"],
+  ].map(([date, name, icon]) => ({date, name, icon}));
+}
+function holidaysBetween(from, to) {   // midnight dates, from <= date <= to, in order
+  const out = [];
+  for (let y = from.getFullYear(); y <= to.getFullYear(); y++) out.push(...holidays(y).filter(h => h.date >= from && h.date <= to));
+  return out.sort((a, b) => a.date - b.date);
+}
+const holMarker = h => {
+  const d = h.date, label = d.toLocaleDateString([], {weekday: "short", month: "short", day: "numeric"});
+  return `<div class="tl-hol" title="${esc(`${h.name} · ${label}`)}"><span class="tl-hol-flag"><span class="tl-hol-i">${h.icon}</span>${esc(h.name)}</span>
+    <span class="tl-hol-dot"></span><span class="tl-hol-d">${esc(d.toLocaleDateString([], {month: "short", day: "numeric"}))}</span></div>`;
+};
 function renderTimeline() {
   const S = DATA.schedule, up = (S && S.upcoming) || [];
   tlSettle();
@@ -1127,15 +1160,26 @@ function renderTimeline() {
   let html = `<div class="tl-now" title="Today"><span class="tl-now-dot"></span><span class="tl-now-l">Now</span>
     <span class="tl-now-d">${esc(today.toLocaleDateString([], {month: "short", day: "numeric"}))}</span></div>`;
   let month = null, k = 0;
+  const monthMark = d => {
+    if (d.getMonth() === month) return;
+    month = d.getMonth();
+    html += `<div class="tl-month"><span>${esc(d.toLocaleDateString([], {month: "long"}))}</span></div>`;
+  };
+  // holidays from today to three weeks past the last slot: one on a posting day tags that slot, the rest sit between slots
+  const midnight = x => new Date(new Date(x).toDateString());
+  const lastDay = midnight(list[list.length - 1].date);
+  const hols = holidaysBetween(today, new Date(lastDay.getFullYear(), lastDay.getMonth(), lastDay.getDate() + 21));
+  let hi = 0;
+  const holsBefore = day => { while (hi < hols.length && hols[hi].date < day) { monthMark(hols[hi].date); html += holMarker(hols[hi++]); } };
   list.forEach((o, i) => {
     const d = new Date(o.date), when = longDay(o.date), hour = hourText(d.getHours());
-    if (d.getMonth() !== month) {
-      month = d.getMonth();
-      html += `<div class="tl-month"><span>${esc(d.toLocaleDateString([], {month: "long"}))}</span></div>`;
-    }
+    holsBefore(midnight(d));
+    const onDay = [];
+    while (hi < hols.length && +hols[hi].date === +midnight(d)) onDay.push(hols[hi++]);
+    monthMark(d);
     const moved = (TL.edit || TL.pending) && o.was !== o.n;
     const kd = dayDiff(o.date), cls = [o === first ? "next" : "", [0, 6].includes(d.getDay()) ? "weekend" : "",
-                                       o.video ? "" : "img-only", moved ? "moved" : ""].join(" ");
+                                       o.video ? "" : "img-only", moved ? "moved" : "", onDay.length ? "holiday" : ""].join(" ");
     const card = o.video
       ? `<img class="thumb tl-img" src="${o.big || o.thumb}" data-big="${o.big || o.thumb}" alt="No. ${esc(o.n)} ${esc(o.title)}" draggable="false"
            data-cap="${esc(`No. ${o.n} · ${o.title}`)}" data-when="${esc(`${when} · ${hour}`)}">${num(o.n, "tl-n")}`
@@ -1147,8 +1191,10 @@ function renderTimeline() {
       <div class="tl-date"><span class="tl-wd">${esc(d.toLocaleDateString([], {weekday: "short"}))}</span>
         <span class="tl-day">${d.getDate()}</span><span class="tl-mo">${esc(d.toLocaleDateString([], {month: "short"}))}</span>
         ${kd <= 1 ? `<span class="tl-rel">${esc(rel(kd))}</span>` : ""}
-        ${moved ? `<span class="tl-was">was No. ${esc(o.was)}</span>` : ""}</div></div>`;
+        ${moved ? `<span class="tl-was">was No. ${esc(o.was)}</span>` : ""}
+        ${onDay.map(h => `<span class="tl-hol-tag" title="${esc(h.name)}">${h.icon} ${esc(h.name)}</span>`).join("")}</div></div>`;
   });
+  holsBefore(new Date(8.64e15));   // the ones after the last queued video
   const track = $("timeline");
   track.innerHTML = html;
   track.classList.toggle("editing", TL.edit);
