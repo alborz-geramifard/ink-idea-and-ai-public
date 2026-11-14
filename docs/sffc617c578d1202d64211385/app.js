@@ -315,6 +315,7 @@ let hovering = null;
 document.addEventListener("mouseover", e => {
   const t = e.target.closest && e.target.closest("img.thumb");
   if (!t || t === hovering) return;
+  if (t.closest(".tl-track.editing")) return;   // no zoom while reordering the Timeline (card #163)
   hovering = t;
   const big = bigCache[t.dataset.big];
   if (big && big.complete && big.naturalWidth) {
@@ -1056,7 +1057,9 @@ async function tlSave() {
                                              enc.encode(JSON.stringify({from, to, at})));
       const r = await fetch(QUEUE_URL, {method: "POST", headers: {"Content-Type": "text/plain"},
                                         body: JSON.stringify({v: 1, iv: toB64(iv), ct: toB64(ct)})});
-      if (r.status !== 204) throw new Error(`the Worker said ${r.status}`);   // an old Worker answers 200 "ok": not saved
+      if (r.status === 200)   // an old Worker (before /queue) answers 200 "ok": nothing was stored (card #163)
+        throw new Error("the website Worker hasn't been updated for saving yet; on the Mac run: python3 Scripts/analytics.py deploy");
+      if (r.status !== 204) throw new Error(`the Worker said ${r.status}`);
       TL.edit = false; TL.pending = {from, to, at};
       tlNote("Saved. The Mac puts it in the queue within a minute…");
     }
@@ -1096,7 +1099,11 @@ function renderTimeline() {
        <button class="tl-btn primary" id="tlSave" ${changed && !TL.busy ? "" : "disabled"}>Save order</button>`
     : `<button class="tl-btn" id="tlStart" ${TL.pending ? "disabled" : ""}>⇄ Change order</button>`) +
     (TL.note ? `<span class="tl-note${TL.bad ? " bad" : ""}" role="status">${esc(TL.note)}</span>` : "");
-  if ($("tlStart")) $("tlStart").onclick = () => { TL.edit = true; TL.order = tlTitles(); tlNote(""); renderTimeline(); };
+  if ($("tlStart")) $("tlStart").onclick = () => {
+    TL.edit = true; TL.order = tlTitles(); tlNote("");
+    hovering = null; preview.hidden = true; zoomCap.hidden = true;   // drop a zoom that was open when edit began
+    renderTimeline();
+  };
   if ($("tlCancel")) $("tlCancel").onclick = () => { TL.edit = false; TL.order = null; tlNote(""); renderTimeline(); };
   if ($("tlSave")) $("tlSave").onclick = tlSave;
   const today = new Date(new Date().toDateString());
