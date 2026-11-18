@@ -11,7 +11,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=751de7ae5a">
 <link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png?v=2c00a92969">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1105770fa1">
-<link rel="stylesheet" href="dash.css?v=a84df150c6">
+<link rel="stylesheet" href="dash.css?v=a80e5a5087">
 </head>
 <body>
 <!-- Sign in: the page holds no data; data.json is AES-256-GCM, key = PBKDF2(username + password) -->
@@ -80,7 +80,8 @@
 
     <article class="card wide">
       <div class="card-h"><h2>Cartoons</h2><span class="note">Click a row for its history. Sort by any column.</span><span class="note" id="boardCount"></span></div>
-      <div class="scroll board-box"><table id="board" class="board"></table></div>
+      <div class="scroll"><table id="board" class="board"></table></div>
+      <button type="button" class="board-more" id="boardMore" aria-expanded="false" hidden></button>
     </article>
 
     <article class="card wide">
@@ -139,6 +140,6 @@
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
-<script src="app.js?v=2ebdbd2a29"></script>
+<script src="app.js?v=3173b3725c"></script>
 </body>
 </html>
