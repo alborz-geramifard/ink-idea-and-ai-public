@@ -105,7 +105,7 @@ const t = s => new Date(s.updated).getTime();
 
 let DATA = null, charts = {}, fails = 0;
 let KEY = null, IV = null, REFRESH = "";   // the unlocked key + which data.json is shown, for live refreshes
-const state = {range: 0, off: new Set(), sort: {key: "n", asc: false}, sel: null, tab: "social"};   // newest cartoon first (user, 2026-11-03)
+const state = {range: 0, off: new Set(), sort: {key: "n", asc: false}, sel: null, tab: "social", boardAll: false};   // newest cartoon first (user, 2026-11-03)
 
 // ---- theme --------------------------------------------------------------------------
 try { const th = localStorage.getItem("ink-theme"); if (th) document.documentElement.dataset.theme = th; } catch (e) {}
@@ -777,7 +777,7 @@ function renderEngTrend() {
   zoomUX("cEngTrend");
 }
 
-const TOP_N = 15;   // Performance per Cartoon shows this many bars; the Cartoons table shows this many rows before scrolling (card #139)
+const TOP_N = 15;   // Performance per Cartoon shows this many bars; the Cartoons table shows this many rows until its arrow expands it (card #349)
 function renderEngPosts() {
   const total = c => ENG.reduce((a, [k]) => a + eng(c, k), 0);
   const key = perfSort() === "views" ? cartoonViews : total;   // the "Sort by" chips (user, 2026-11-07)
@@ -879,7 +879,7 @@ function renderBoard() {
                 [null, "Trend"]];
   $("board").innerHTML = `<thead><tr>${cols.map(([k, l]) =>
       `<th ${k ? `data-k="${k}"` : ""} class="${k === key ? "sorted" + (asc ? " asc" : "") : ""}">${l}</th>`).join("")}</tr></thead><tbody>` +
-    rows.map(row => `<tr data-n="${row.n}" class="${row.n === state.sel ? "sel" : ""}">
+    rows.map((row, i) => `<tr data-n="${row.n}" class="${[row.n === state.sel ? "sel" : "", i >= TOP_N && row.n !== state.sel ? "more" : ""].join(" ").trim()}">
       <td><div class="cell-cartoon">${thumb(row.n)}<span>${num(row.n)} ${esc(row.c.title)}</span></div></td>
       <td><b>${fmt(row.total)}</b></td>
       <td>${row.change == null ? `<span class="muted">–</span>` : delta(row.total, row.total - row.change)}</td>${pcols.map(p => `<td>${fmt(row[p.k])}</td>`).join("")}
@@ -887,8 +887,7 @@ function renderBoard() {
       <td>${row.rate == null ? "–" : fmt(row.rate, 1) + "%"}</td><td>${row.tw == null ? "–" : fmt(row.tw, 1) + " s"}</td>
       <td>${row.tc == null ? "–" : fmt(row.tc, 1) + "%"}</td><td>${row.rw == null ? "–" : fmt(row.rw, 1) + " s"}</td>
       <td>${spark(row.trend)}</td></tr>`).join("") + "</tbody>";
-  $("boardCount").textContent = rows.length > TOP_N ? `top ${TOP_N} of ${rows.length} · scroll for the rest` : "";
-  fitBoard();
+  fitBoard(rows.length);
   $("board").querySelector("thead").onclick = e => {
     const th = e.target.closest("th[data-k]"); if (!th) return;
     const k = th.dataset.k;
@@ -903,14 +902,22 @@ function renderBoard() {
   };
 }
 
-// the table box is as tall as its header plus the first TOP_N rows; the rest scroll inside it, header pinned (card #139)
-function fitBoard() {
-  const box = $("board").parentElement, trs = $("board").querySelectorAll("tbody tr");
-  if (trs.length <= TOP_N) { box.style.maxHeight = "none"; return; }
-  const last = trs[TOP_N - 1], h = last.offsetTop + last.offsetHeight;
-  box.style.maxHeight = h > 0 ? `${h + 1}px` : "";
+// the table shows the first TOP_N rows; an arrow under it expands the full table, so the page scrolls instead of
+// a box inside it (card #349, replaces card #139's inner scroll). The selected row always shows.
+function fitBoard(n) {
+  const more = $("boardMore"), extra = n > TOP_N, all = extra && state.boardAll;
+  $("board").classList.toggle("collapsed", extra && !all);
+  $("boardCount").textContent = extra && !all ? `top ${TOP_N} of ${n}` : "";
+  more.hidden = !extra;
+  more.setAttribute("aria-expanded", all);
+  more.innerHTML = all ? `<span class="arr">▾</span> Show top ${TOP_N} only` : `<span class="arr">▾</span> Show all ${n} cartoons`;
+  more.onclick = () => {
+    const top = $("board").getBoundingClientRect().top;
+    state.boardAll = !state.boardAll; fitBoard(n);
+    // collapsing: keep the table where it was instead of leaving the reader far below it
+    if (!state.boardAll && top < 0) $("board").closest(".card").scrollIntoView({block: "start"});
+  };
 }
-addEventListener("resize", () => { if (DATA && !$("socialView").hidden) fitBoard(); });
 
 function renderDetail() {
   const n = state.sel, c = n && latest().cartoons[n];
