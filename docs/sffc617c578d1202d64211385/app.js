@@ -1033,7 +1033,9 @@ function untilText(ms) {
 // seals {from, to, at} with the dashboard key and hands it to the Worker (POST /queue); the Mac applies it within
 // ~30 s (queue_reorder.apply_pending) and publishes fresh data. The local page posts it to Scripts/dashboard_local.py.
 const QUEUE_URL = "https://ink-analytics.inkideaandai.workers.dev/queue";
-const TL = {edit: false, order: null, drag: null, pending: null, note: "", bad: false, busy: false};
+// Swap (card #423): drop a picture onto the middle of another, or tap ⇄ on one and then ⇄ on the other: the two trade
+// places and everything between them stays put (the edges of a picture still mean "insert before / after").
+const TL = {edit: false, order: null, drag: null, pick: null, pending: null, note: "", bad: false, busy: false};
 const tlTitles = () => ((DATA.schedule && DATA.schedule.upcoming) || []).map(o => o.title);
 const sameList = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
 function tlNote(text, bad = false) { TL.note = text; TL.bad = bad; }
@@ -1088,6 +1090,14 @@ function tlMove(title, to) {
   o.splice(from, 1); o.splice(to, 0, title);
   renderTimeline();
 }
+function tlSwap(a, b) {
+  const o = TL.order, i = o.indexOf(a), j = o.indexOf(b);
+  TL.pick = null;
+  if (i >= 0 && j >= 0 && i !== j) [o[i], o[j]] = [o[j], o[i]];
+  renderTimeline();
+}
+// where a drop on picture `it` lands: the middle 40 % swaps, the outer parts insert before / after
+const tlZone = (it, x) => { const b = it.getBoundingClientRect(), f = (x - b.left) / b.width; return f < .3 ? "before" : f > .7 ? "after" : "swap"; };
 // Holidays on the line (card #193): the main US shopping / posting days, worked out for any year (no list to keep up).
 function nthDay(y, m, wd, n) {   // n-th weekday wd (0 = Sun) of month m (0-based); n = -1 is the last one
   if (n > 0) { const d = new Date(y, m, 1); return new Date(y, m, 1 + (wd - d.getDay() + 7) % 7 + (n - 1) * 7); }
@@ -1134,17 +1144,18 @@ function renderTimeline() {
   $("tlView").querySelector(".tl-card-box").hidden = !vids.length;
   if (!vids.length) return;
   $("tlEdit").innerHTML = (TL.edit
-    ? `<span class="tl-edit-hint">Drag the pictures into the order you want (or use ‹ ›); the dates stay put. Nothing changes until you save.</span>
+    ? `<span class="tl-edit-hint">${TL.pick ? `Now tap ⇄ on the picture to swap with “${esc(TL.pick)}” (tap it again to cancel).`
+       : "Drag a picture between two others to move it, or onto another one to swap them (or use ‹ › and ⇄). The dates stay put. Nothing changes until you save."}</span>
        <button class="tl-btn" id="tlCancel" ${TL.busy ? "disabled" : ""}>Cancel</button>
        <button class="tl-btn primary" id="tlSave" ${changed && !TL.busy ? "" : "disabled"}>Save order</button>`
     : `<button class="tl-btn" id="tlStart" ${TL.pending ? "disabled" : ""}>⇄ Change order</button>`) +
     (TL.note ? `<span class="tl-note${TL.bad ? " bad" : ""}" role="status">${esc(TL.note)}</span>` : "");
   if ($("tlStart")) $("tlStart").onclick = () => {
-    TL.edit = true; TL.order = tlTitles(); tlNote("");
+    TL.edit = true; TL.order = tlTitles(); TL.pick = null; tlNote("");
     hovering = null; preview.hidden = true; zoomCap.hidden = true;   // drop a zoom that was open when edit began
     renderTimeline();
   };
-  if ($("tlCancel")) $("tlCancel").onclick = () => { TL.edit = false; TL.order = null; tlNote(""); renderTimeline(); };
+  if ($("tlCancel")) $("tlCancel").onclick = () => { TL.edit = false; TL.order = null; TL.pick = null; tlNote(""); renderTimeline(); };
   if ($("tlSave")) $("tlSave").onclick = tlSave;
   const today = new Date(new Date().toDateString());
   const dayDiff = d => Math.round((new Date(new Date(d).toDateString()) - today) / 864e5);
@@ -1186,12 +1197,15 @@ function renderTimeline() {
     monthMark(d);
     const moved = (TL.edit || TL.pending) && o.was !== o.n;
     const kd = dayDiff(o.date), cls = [o === first ? "next" : "", [0, 6].includes(d.getDay()) ? "weekend" : "",
-                                       o.video ? "" : "img-only", moved ? "moved" : "", onDay.length ? "holiday" : ""].join(" ");
+                                       o.video ? "" : "img-only", moved ? "moved" : "", onDay.length ? "holiday" : "",
+                                       TL.edit && TL.pick === o.title ? "picked" : ""].join(" ");
     const card = o.video
       ? `<img class="thumb tl-img" src="${o.big || o.thumb}" data-big="${o.big || o.thumb}" alt="No. ${esc(o.n)} ${esc(o.title)}" draggable="false"
            data-cap="${esc(`No. ${o.n} · ${o.title}`)}" data-when="${esc(`${when} · ${hour}`)}">${num(o.n, "tl-n")}`
       : `<span class="tl-ghost" title="${esc(`No. ${o.n} ${o.title}: image post, no video`)}">image<br>post${TL.edit ? `<small>${esc(o.title)}</small>` : ""}</span>`;
-    const arrows = TL.edit ? `<div class="tl-move"><button data-mv="-1" aria-label="Earlier" ${i ? "" : "disabled"}>‹</button>` +
+    const swapBtn = `<button class="tl-swap" data-swap aria-pressed="${TL.pick === o.title}" ` +
+      `aria-label="${esc(TL.pick && TL.pick !== o.title ? `Swap with ${TL.pick}` : `Swap ${o.title} with another`)}">⇄</button>`;
+    const arrows = TL.edit ? `<div class="tl-move"><button data-mv="-1" aria-label="Earlier" ${i ? "" : "disabled"}>‹</button>${swapBtn}` +
                              `<button data-mv="1" aria-label="Later" ${i < list.length - 1 ? "" : "disabled"}>›</button></div>` : "";
     html += `<div class="tl-item ${cls}" style="--i:${k++}" data-t="${esc(o.title)}"${TL.edit ? ' draggable="true"' : ""}>
       <div class="tl-card">${card}${arrows}</div><div class="tl-stem"></div><div class="tl-node"></div>
@@ -1225,7 +1239,7 @@ function renderTimeline() {
     renderTimeline.ends = ends;
     // drag and drop (edit mode): drop before or after the item under the pointer; the line scrolls near its edges
     const item = e => e.target.closest && e.target.closest(".tl-item[data-t]");
-    const clearMarks = () => track.querySelectorAll(".drop-before, .drop-after").forEach(x => x.classList.remove("drop-before", "drop-after"));
+    const clearMarks = () => track.querySelectorAll(".drop-before, .drop-after, .drop-swap").forEach(x => x.classList.remove("drop-before", "drop-after", "drop-swap"));
     track.addEventListener("dragstart", e => {
       const it = item(e);
       if (!TL.edit || !it) return;
@@ -1242,8 +1256,7 @@ function renderTimeline() {
       const it = item(e);
       clearMarks();
       if (!it || it.dataset.t === TL.drag) return;
-      const b = it.getBoundingClientRect();
-      it.classList.add(e.clientX < b.left + b.width / 2 ? "drop-before" : "drop-after");
+      it.classList.add("drop-" + tlZone(it, e.clientX));
     });
     track.addEventListener("drop", e => {
       if (!TL.drag) return;
@@ -1251,15 +1264,26 @@ function renderTimeline() {
       const it = item(e), t = TL.drag;
       TL.drag = null;
       if (!it || it.dataset.t === t) { clearMarks(); return; }
-      const b = it.getBoundingClientRect(), after = e.clientX >= b.left + b.width / 2;
+      const zone = tlZone(it, e.clientX);
+      if (zone === "swap") { tlSwap(t, it.dataset.t); return; }
       const o = TL.order.filter(x => x !== t);
-      o.splice(o.indexOf(it.dataset.t) + (after ? 1 : 0), 0, t);
-      TL.order = o;
+      o.splice(o.indexOf(it.dataset.t) + (zone === "after" ? 1 : 0), 0, t);
+      TL.order = o; TL.pick = null;
       renderTimeline();
     });
-    track.addEventListener("click", e => {   // ‹ › one step earlier / later (touch screens, keyboard)
+    track.addEventListener("click", e => {   // ‹ › one step earlier / later, ⇄ swap two (touch screens, keyboard)
+      const sw = e.target.closest && e.target.closest("[data-swap]"), sit = sw && item(e);
+      if (TL.edit && sit) {
+        const t = sit.dataset.t;
+        if (!TL.pick || TL.pick === t) { TL.pick = TL.pick ? null : t; renderTimeline(); }
+        else tlSwap(TL.pick, t);
+        const again = track.querySelector(`.tl-item[data-t="${CSS.escape(t)}"] [data-swap]`);
+        if (again) again.focus();
+        return;
+      }
       const btn = e.target.closest && e.target.closest("[data-mv]"), it = btn && item(e);
       if (!TL.edit || !it) return;
+      TL.pick = null;
       tlMove(it.dataset.t, TL.order.indexOf(it.dataset.t) + +btn.dataset.mv);
       const again = track.querySelector(`.tl-item[data-t="${CSS.escape(it.dataset.t)}"] [data-mv="${btn.dataset.mv}"]`);
       if (again && !again.disabled) again.focus();
