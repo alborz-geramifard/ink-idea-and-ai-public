@@ -347,11 +347,9 @@ document.addEventListener("mousemove", e => {
   if (!zoomCap.hidden) { zoomCap.style.left = x + "px"; zoomCap.style.top = (y + h) + "px"; zoomCap.style.width = w + "px"; }
 });
 
-function reelWatch(s) {   // median Instagram (Reel) watch time; > 60 s is a looping outlier, not real watching
-  const w = Object.values(s.cartoons).map(c => c.instagram_reel && c.instagram_reel.avg_watch_s)
-    .filter(v => v > 0 && v < 60).sort((a, b) => a - b);
-  return w.length ? w[Math.floor(w.length / 2)] : null;
-}
+// average watch time over every cartoon on the selected platforms, weighted by views (card #464; replaced the
+// Instagram-only median). > 60 s per platform is a looping outlier and is left out (see watch()).
+const allWatch = s => avgWatch(Object.values(s.cartoons).flatMap(watchParts));
 
 // ---- what changed (last 24 h) --------------------------------------------------------
 function renderChanges() {
@@ -397,8 +395,8 @@ function renderTiles() {
     ["Views", fmt(allViews(now)), delta(allViews(now), then && allViews(then)) + ` ${when}`],
     ["Interactions", fmt(allInter(now)), delta(allInter(now), then && allInter(then)) + ` ${when}`],
     ["👤", fmt(allFollowers(now)), delta(allFollowers(now), then && allFollowers(then)) + ` ${when}`],
-    [`${iconHtml(PLAT.find(p => p.k === "instagram_reel"))} watch time`, reelWatch(now) == null ? "–" : fmt(reelWatch(now), 1) + " s",
-     delta(reelWatch(now), then && reelWatch(then), 1) + ` ${when}`],
+    [`<span title="Average watch time per view on the selected platforms, weighted by views">⏱ Avg watch</span>`, allWatch(now) == null ? "–" : fmt(allWatch(now), 1) + " s",
+     delta(allWatch(now), then && allWatch(then), 1) + ` ${when}`],
     ["Top cartoon", best ? num(best[0], "lg") : "–", best ? `${esc(best[1].title)} · ${fmt(cartoonViews(best[1]))} views` : ""],
   ];
   $("tiles").innerHTML = tiles.map(([k, v, d]) =>
@@ -812,25 +810,27 @@ function renderEngPosts() {
   }, true);
 }
 
-// Watch time per Cartoon (card #457): one bar per cartoon = its average watch time per view, weighted by each
+// Average watch time per Cartoon (card #457; top 15, highest first since card #464): one bar per cartoon = its average watch time per view, weighted by each
 // platform's views (so a 1,000-view YouTube Short counts more than a 10-view Facebook Reel). Hover lists every
 // platform's own average. Bars take the Living / Panning / Drawing colour. Only the selected platforms that report watch time (TikTok, Instagram, YouTube, Facebook).
+const WATCH_TOP = 15;
 const watchParts = c => on().map(p => ({p, s: watch(c, p.k), v: views(c, p.k)})).filter(x => x.s != null);
 const avgWatch = parts => { const w = parts.reduce((a, x) => a + x.v, 0);
   return parts.length ? (w ? parts.reduce((a, x) => a + x.s * x.v, 0) / w : parts.reduce((a, x) => a + x.s, 0) / parts.length) : null; };
 function renderWatch() {
   const cs = Object.entries(latest().cartoons).map(([n, c]) => ({n: +n, c, parts: watchParts(c)}))
-    .filter(x => x.parts.length).sort((a, b) => a.n - b.n);   // posting order
+    .filter(x => x.parts.length);
   cs.forEach(x => x.avg = avgWatch(x.parts));
-  const all = avgWatch(cs.flatMap(x => x.parts)), o = base();
-  $("watchCount").textContent = cs.length ? `${cs.length} cartoon${cs.length === 1 ? "" : "s"} · overall ${fmt(all, 1)} s` : "";
+  const all = avgWatch(cs.flatMap(x => x.parts)), o = base(), total = cs.length;   // overall average: every cartoon, not only the top 15
+  cs.sort((a, b) => b.avg - a.avg || a.n - b.n).splice(WATCH_TOP);   // highest average first, top 15 (card #464)
+  $("watchCount").textContent = total ? `${total > WATCH_TOP ? `top ${WATCH_TOP} of ${total}` : `${total} cartoon${total === 1 ? "" : "s"}`} · overall ${fmt(all, 1)} s` : "";
   chart("cWatch").setOption({
     ...o, legend: {show: false}, grid: {...o.grid, top: 16},
     tooltip: {...o.tooltip, trigger: "item", formatter: p => { const x = cs[p.dataIndex];
       return `<b>${num(x.n)} ${esc(x.c.title)}</b> ${formatTag(x.c.format)}<br>⏱ average <b>${fmt(x.avg, 1)} s</b><br>` +
         x.parts.slice().sort((a, b) => b.s - a.s).map(y => `${iconHtml(y.p)} <b>${fmt(y.s, 1)} s</b> <span style="opacity:.7">· ${fmt(y.v)} views</span>`).join("<br>"); }},
     xAxis: {...o.xAxis, type: "category", data: cs.map(x => `{num|${x.n}}`),
-            axisLabel: {...o.xAxis.axisLabel, interval: cs.length > 30 ? "auto" : 0, fontSize: 11, rich: {num: numRich(16)}}},   // every number until they would crowd
+            axisLabel: {...o.xAxis.axisLabel, interval: 0, fontSize: 11, rich: {num: numRich(16)}}},   // at most 15 bars: every number fits
     yAxis: {...o.yAxis, type: "value", axisLabel: {...o.yAxis.axisLabel, formatter: v => v + " s"}},
     series: [{name: "⏱", type: "bar", barMaxWidth: 34, data: cs.map(x => ({value: +x.avg.toFixed(1),   // coloured by video style, to compare them (card #455)
                 itemStyle: {color: css(FORMAT_TAGS[x.c.format] ? "--" + x.c.format : "--s6"), borderRadius: [4, 4, 0, 0]}})),
@@ -892,7 +892,7 @@ function renderBoard() {
   const rows = Object.entries(now.cartoons).map(([n, c]) => {
     const row = {n: +n, c, total: cartoonViews(c), inter: ps.reduce((a, p) => a + inter(c[p.k]), 0)};
     ENG.forEach(([k]) => { row[k] = eng(c, k); });
-    row.rate = rate(c); row.tw = watch(c, "tiktok"); row.rw = watch(c, "instagram_reel");
+    row.rate = rate(c); row.aw = avgWatch(watchParts(c));   // one average watch column for all selected platforms (card #464)
     row.tc = c.tiktok && c.tiktok.completion_pct != null ? c.tiktok.completion_pct : null;
     // posted but not read yet (X every 3 h, LinkedIn every 4 h) shows 0; "–" only where it was never posted (card #88)
     ps.forEach(p => { row[p.k] = c[p.k] ? c[p.k].views : posted(n, p.k) ? 0 : null; });
@@ -911,9 +911,8 @@ function renderBoard() {
   rows.sort((a, b) => ((key === "n" ? a.n - b.n : (a[key] ?? -1) - (b[key] ?? -1))) * (asc ? 1 : -1));
   const cols = [["n", "Cartoon"], ["total", `<span title="Total views on all platforms">∑</span>`], ["change", `<span title="Views since the same time yesterday">Δ (1D)</span>`], ...pcols.map(p => [p.k, iconHtml(p)]), ["inter", `<span title="Total interactions: likes, comments, shares, saves">∑</span>`], ...ecols.map(([k, l, ic]) => [k, `<span title="${l}">${ic}</span>`]),
                 ["rate", `<span title="Engagement rate: interactions per 100 views">Eng %</span>`],
-                ["tw", `<span title="TikTok average watch time">⏱ ${iconHtml(PLAT[0])}</span>`],
+                ["aw", `<span title="Average watch time per view on the selected platforms, weighted by views">⏱ Avg</span>`],
                 ["tc", `<span title="TikTok: watched to the end">✓ ${iconHtml(PLAT[0])}</span>`],
-                ["rw", `<span title="Instagram average watch time">⏱ ${iconHtml(PLAT[1])}</span>`],
                 [null, "Trend"]];
   $("board").innerHTML = `<thead><tr>${cols.map(([k, l]) =>
       `<th ${k ? `data-k="${k}"` : ""} class="${k === key ? "sorted" + (asc ? " asc" : "") : ""}">${l}</th>`).join("")}</tr></thead><tbody>` +
@@ -922,8 +921,8 @@ function renderBoard() {
       <td><b>${fmt(row.total)}</b></td>
       <td>${row.change == null ? `<span class="muted">–</span>` : delta(row.total, row.total - row.change)}</td>${pcols.map(p => `<td>${fmt(row[p.k])}</td>`).join("")}
       <td><b>${fmt(row.inter)}</b></td>${ecols.map(([k]) => `<td class="${row[k] ? "" : "muted"}">${fmt(row[k])}</td>`).join("")}
-      <td>${row.rate == null ? "–" : fmt(row.rate, 1) + "%"}</td><td>${row.tw == null ? "–" : fmt(row.tw, 1) + " s"}</td>
-      <td>${row.tc == null ? "–" : fmt(row.tc, 1) + "%"}</td><td>${row.rw == null ? "–" : fmt(row.rw, 1) + " s"}</td>
+      <td>${row.rate == null ? "–" : fmt(row.rate, 1) + "%"}</td><td>${row.aw == null ? "–" : fmt(row.aw, 1) + " s"}</td>
+      <td>${row.tc == null ? "–" : fmt(row.tc, 1) + "%"}</td>
       <td>${spark(row.trend)}</td></tr>`).join("") + "</tbody>";
   fitBoard(rows.length);
   $("board").querySelector("thead").onclick = e => {
@@ -998,7 +997,7 @@ function renderDetail() {
     PLAT.map(p => {
       const d = c[p.k]; if (!d) return posted(n, p.k) ? line(iconHtml(p), {views: 0}, ` <span class="muted">· posted, not read yet</span>`) : "";
       const bits = [d.reach != null ? `reach ${fmt(d.reach)}` : "", inter(d) ? ENG.filter(([k]) => d[k]).map(([k, l, ic]) => `${ic} ${fmt(d[k])}`).join(" ") : "",
-                    d.avg_watch_s ? `watch ${fmt(Math.min(d.avg_watch_s, 999), 1)} s` : "",
+                    d.avg_watch_s ? `avg watch ${fmt(Math.min(d.avg_watch_s, 999), 1)} s` : "",
                     d.completion_pct != null ? `${fmt(d.completion_pct, 1)}% watched to the end` : "",
                     d.link_clicks ? `${fmt(d.link_clicks)} link clicks` : ""].filter(Boolean);
       return line(iconHtml(p), d, bits.length ? ` <span class="muted">· ${bits.join(" · ")}</span>` : "");
