@@ -17,7 +17,7 @@
      IG Reel pink, IG image orange */
   --p-tiktok: #111111; --p-ig: #e1306c; --p-igimg: #f58529; --p-yt: #ff0000; --p-fb: #1877f2; --p-pin: #a8001c;
   --p-li: #0b3d91; --p-threads: #7d7d82; --p-x: #111111;
-  --living: #6250d6; --drawing: #8a8984;
+  --living: #6250d6; --drawing: #8a8984; --panning: #1d8585;
   /* engagement kinds: likes red, comments violet, shares orange, saves slate (not used by platforms) */
   /* engagement in each icon's main colour (user, 2026-11-01): 👍 yellow, 💬 bubble grey, ↗ ink black,
      🔖 its red ribbon (the tag itself is white), 👤 slate blue */
@@ -32,7 +32,7 @@
     --s1: #2f9e55; --s2: #86d69b; --s3: #e8b923; --s4: #3f7fdc; --s5: #97c6f4; --s6: #4fb3a1; --s7: #a48cf0; --s8: #e08a5f; --s9: #4f9ee8;
     --p-tiktok: #f2f2f2; --p-ig: #f0508a; --p-igimg: #ff9a4a; --p-yt: #ff3030; --p-fb: #3d8bff; --p-pin: #c73a52;
     --p-li: #7fa8e8; --p-threads: #a9a9ae; --p-x: #f2f2f2;
-    --living: #9085e9; --drawing: #8f8d85;
+    --living: #9085e9; --drawing: #8f8d85; --panning: #4fc2bd;
     --e1: #f5c042; --e2: #c9ccd1; --e3: #eeeeee; --e4: #f06a6a; --e5: #8aa8d6;
   }
 }
@@ -44,7 +44,7 @@
   --s1: #2f9e55; --s2: #86d69b; --s3: #e8b923; --s4: #3f7fdc; --s5: #97c6f4; --s6: #4fb3a1; --s7: #a48cf0; --s8: #e08a5f; --s9: #4f9ee8;
   --p-tiktok: #f2f2f2; --p-ig: #f0508a; --p-igimg: #ff9a4a; --p-yt: #ff3030; --p-fb: #3d8bff; --p-pin: #c73a52;
   --p-li: #7fa8e8; --p-threads: #a9a9ae; --p-x: #f2f2f2;
-  --living: #9085e9; --drawing: #8f8d85;
+  --living: #9085e9; --drawing: #8f8d85; --panning: #4fc2bd;
     --e1: #f5c042; --e2: #c9ccd1; --e3: #eeeeee; --e4: #f06a6a; --e5: #8aa8d6;
 }
 
@@ -154,6 +154,13 @@ img.pl.pltag-img { margin-left: 3px; }
 
 /* thumbnails */
 .cell-cartoon { display: flex; align-items: center; gap: 10px; }
+/* the video's tag (card #455): Panning (camera only) vs Living (animated) vs Drawing */
+.ftag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 700;
+  line-height: 1.5; vertical-align: 1px; white-space: nowrap; letter-spacing: .02em; font-family: inherit;
+  color: var(--living); background: color-mix(in srgb, var(--living) 14%, transparent); }
+.ftag-panning { color: var(--panning); background: color-mix(in srgb, var(--panning) 15%, transparent); }
+.ftag-drawing { color: var(--drawing); background: color-mix(in srgb, var(--drawing) 15%, transparent); }
+.tl-date .ftag { margin: 5px 0 0; }
 .thumb { width: 30px; height: 53px; object-fit: cover; border-radius: 4px; border: 1px solid var(--grid); flex: none; }
 .thumb.lg { width: 40px; height: 71px; vertical-align: middle; margin-right: 10px; }
 

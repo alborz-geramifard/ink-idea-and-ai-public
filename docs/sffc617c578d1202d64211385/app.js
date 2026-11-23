@@ -846,6 +846,11 @@ function spark(values) {
     <polyline points="${pts.join(" ")}" fill="none" stroke="var(--text-secondary)" stroke-width="1.5" stroke-linejoin="round"/>
     <circle cx="${pts[pts.length - 1].split(",")[0]}" cy="${pts[pts.length - 1].split(",")[1]}" r="2.5" fill="var(--accent)"/></svg>`;
 }
+// the video's tag (card #455): Panning = only pans/zooms over the drawing, Living = something in it is animated,
+// Drawing = the drawing video. From stats.py's "format", so the two styles can be compared later.
+const FORMAT_TAGS = {panning: ["Panning", "Camera pans and zooms over the still drawing, nothing animated"],
+                     living: ["Living", "Animated video"], drawing: ["Drawing", "The drawing video: the cartoon draws itself"]};
+const formatTag = f => FORMAT_TAGS[f] ? `<span class="ftag ftag-${f}" title="${FORMAT_TAGS[f][1]}">${FORMAT_TAGS[f][0]}</span>` : "";
 // is cartoon n live on dashboard column k? From links.json via stats.py (DATA.posted, card #88, 2026-11-10)
 const posted = (n, k) => ((DATA && DATA.posted || {})[String(n)] || []).includes(k);
 function renderBoard() {
@@ -880,7 +885,7 @@ function renderBoard() {
   $("board").innerHTML = `<thead><tr>${cols.map(([k, l]) =>
       `<th ${k ? `data-k="${k}"` : ""} class="${k === key ? "sorted" + (asc ? " asc" : "") : ""}">${l}</th>`).join("")}</tr></thead><tbody>` +
     rows.map((row, i) => `<tr data-n="${row.n}" class="${[row.n === state.sel ? "sel" : "", i >= TOP_N && row.n !== state.sel ? "more" : ""].join(" ").trim()}">
-      <td><div class="cell-cartoon">${thumb(row.n)}<span>${num(row.n)} ${esc(row.c.title)}</span></div></td>
+      <td><div class="cell-cartoon">${thumb(row.n)}<span>${num(row.n)} ${esc(row.c.title)}${formatTag(row.c.format)}</span></div></td>
       <td><b>${fmt(row.total)}</b></td>
       <td>${row.change == null ? `<span class="muted">–</span>` : delta(row.total, row.total - row.change)}</td>${pcols.map(p => `<td>${fmt(row[p.k])}</td>`).join("")}
       <td><b>${fmt(row.inter)}</b></td>${ecols.map(([k]) => `<td class="${row[k] ? "" : "muted"}">${fmt(row[k])}</td>`).join("")}
@@ -923,7 +928,7 @@ function renderDetail() {
   const n = state.sel, c = n && latest().cartoons[n];
   $("detail").hidden = !c;
   if (!c) return;
-  $("detailTitle").innerHTML = `${thumb(n, "thumb lg")}${num(n)} ${esc(c.title)}`;
+  $("detailTitle").innerHTML = `${thumb(n, "thumb lg")}${num(n)} ${esc(c.title)}${formatTag(c.format)}`;
   // the post's whole life, whatever the page's range buttons say (user, 2026-11-01): from posting to the latest reading
   const r = snaps().filter(s => s.cartoons[n]), o = base(), surface = css("--surface-1");
   const born = postedAt(c), from = born ? Math.min(new Date(born).getTime(), r.length ? t(r[0]) : Infinity) : undefined;
@@ -1212,6 +1217,7 @@ function renderTimeline() {
       <div class="tl-date"><span class="tl-wd">${esc(d.toLocaleDateString([], {weekday: "short"}))}</span>
         <span class="tl-day">${d.getDate()}</span><span class="tl-mo">${esc(d.toLocaleDateString([], {month: "short"}))}</span>
         ${kd <= 1 ? `<span class="tl-rel">${esc(rel(kd))}</span>` : ""}
+        ${formatTag(o.format)}
         ${moved ? `<span class="tl-was">was No. ${esc(o.was)}</span>` : ""}
         ${onDay.map(h => `<span class="tl-hol-tag" title="${esc(h.name)}">${h.icon} ${esc(h.name)}</span>`).join("")}</div></div>`;
   });
