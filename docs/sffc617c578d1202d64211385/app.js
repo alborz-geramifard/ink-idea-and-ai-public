@@ -808,6 +808,35 @@ function renderEngPosts() {
   }, true);
 }
 
+// Watch time per Cartoon (card #457): one bar per cartoon = its average watch time per view, weighted by each
+// platform's views (so a 1,000-view YouTube Short counts more than a 10-view Facebook Reel). Hover lists every
+// platform's own average. Bars take the Living / Panning / Drawing colour. Only the selected platforms that report watch time (TikTok, Instagram, YouTube, Facebook).
+const watchParts = c => on().map(p => ({p, s: watch(c, p.k), v: views(c, p.k)})).filter(x => x.s != null);
+const avgWatch = parts => { const w = parts.reduce((a, x) => a + x.v, 0);
+  return parts.length ? (w ? parts.reduce((a, x) => a + x.s * x.v, 0) / w : parts.reduce((a, x) => a + x.s, 0) / parts.length) : null; };
+function renderWatch() {
+  const cs = Object.entries(latest().cartoons).map(([n, c]) => ({n: +n, c, parts: watchParts(c)}))
+    .filter(x => x.parts.length).sort((a, b) => a.n - b.n);   // posting order
+  cs.forEach(x => x.avg = avgWatch(x.parts));
+  const all = avgWatch(cs.flatMap(x => x.parts)), o = base();
+  $("watchCount").textContent = cs.length ? `${cs.length} cartoon${cs.length === 1 ? "" : "s"} · overall ${fmt(all, 1)} s` : "";
+  chart("cWatch").setOption({
+    ...o, legend: {show: false}, grid: {...o.grid, top: 16},
+    tooltip: {...o.tooltip, trigger: "item", formatter: p => { const x = cs[p.dataIndex];
+      return `<b>${num(x.n)} ${esc(x.c.title)}</b> ${formatTag(x.c.format)}<br>⏱ average <b>${fmt(x.avg, 1)} s</b><br>` +
+        x.parts.slice().sort((a, b) => b.s - a.s).map(y => `${iconHtml(y.p)} <b>${fmt(y.s, 1)} s</b> <span style="opacity:.7">· ${fmt(y.v)} views</span>`).join("<br>"); }},
+    xAxis: {...o.xAxis, type: "category", data: cs.map(x => `{num|${x.n}}`),
+            axisLabel: {...o.xAxis.axisLabel, interval: cs.length > 30 ? "auto" : 0, fontSize: 11, rich: {num: numRich(16)}}},   // every number until they would crowd
+    yAxis: {...o.yAxis, type: "value", axisLabel: {...o.yAxis.axisLabel, formatter: v => v + " s"}},
+    series: [{name: "⏱", type: "bar", barMaxWidth: 34, data: cs.map(x => ({value: +x.avg.toFixed(1),   // coloured by video style, to compare them (card #455)
+                itemStyle: {color: css(FORMAT_TAGS[x.c.format] ? "--" + x.c.format : "--s6"), borderRadius: [4, 4, 0, 0]}})),
+              markLine: all == null ? undefined : {silent: true, symbol: "none", data: [{yAxis: +all.toFixed(1)}],
+                lineStyle: {color: css("--text-muted"), type: "dashed"}, label: {position: "insideEndTop", color: css("--text-secondary"), formatter: d => `avg ${d.value} s`}}}],
+    graphic: cs.length ? [] : [{type: "text", left: "center", top: "middle",
+      style: {text: "No watch time yet on the selected platforms.", fill: css("--text-muted"), fontSize: 13}}],
+  }, true);
+}
+
 // ---- comments --------------------------------------------------------------------
 const ago = iso => {
   const m = Math.max(0, (Date.now() - new Date(iso).getTime()) / 60000);
@@ -1021,7 +1050,7 @@ function renderAll() {
   if (tl) { renderTimeline(); return; }
   fitCharts();   // charts sized while their tab was hidden come back squeezed (ECharts falls back to 100 px)
   if (web) { renderWeb(); return; }
-  renderChanges(); renderTiles(); renderTrend(); renderAge(); renderEngTrend(); renderEngPosts(); renderMix(); renderBoard(); renderDetail(); renderComments();
+  renderChanges(); renderTiles(); renderTrend(); renderAge(); renderEngTrend(); renderEngPosts(); renderWatch(); renderMix(); renderBoard(); renderDetail(); renderComments();
   preloadBig();
 }
 
