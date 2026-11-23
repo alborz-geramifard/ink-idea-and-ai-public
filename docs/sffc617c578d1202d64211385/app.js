@@ -251,19 +251,23 @@ async function askFreshOnce() {
   while (Date.now() < until) {
     await new Promise(r => setTimeout(r, 15000));
     if (!DATA) return;   // signed out meanwhile
-    try {
-      const v = await dataVersion();
-      if (!v || v === DATA_VER) continue;
-      const blob = await loadBlob();
-      if (blob.iv !== IV) {
-        DATA = await decrypt(KEY, blob); IV = blob.iv;
-        REFRESH = "just refreshed"; renderAll();
-        setTimeout(() => { if (REFRESH === "just refreshed") { REFRESH = ""; renderAll(); } }, 60000);
-        return;
-      }
-    } catch (e) {}
+    if (await loadIfNew()) {
+      REFRESH = "just refreshed"; renderAll();
+      setTimeout(() => { if (REFRESH === "just refreshed") { REFRESH = ""; renderAll(); } }, 60000);
+      return;
+    }
   }
   REFRESH = "no fresh numbers (is the Mac asleep?)"; renderAll();
+}
+async function loadIfNew() {   // a newer data upload than the one shown: load it (true when it did)
+  try {
+    const v = await dataVersion();
+    if (!v || v === DATA_VER) return false;
+    const blob = await loadBlob();
+    if (blob.iv === IV) return false;
+    DATA = await decrypt(KEY, blob); IV = blob.iv;
+    return true;
+  } catch (e) { return false; }
 }
 
 // ---- data helpers -------------------------------------------------------------------
@@ -1111,11 +1115,25 @@ async function tlSave() {
   }
   TL.busy = false;
   renderAll();
-  if (TL.pending) {
-    await askFresh();
-    if (TL.pending && DATA) {   // no answer yet: the row waits in the Worker for the Mac's next run
-      tlNote("Sent, but the Mac hasn't applied it yet (asleep?). It goes in on its next run.", true); renderAll();
+  if (TL.pending) await tlWait(TL.pending);
+}
+// Wait for the Mac's answer to one Save (card #459). This used to call askFresh(), which returns at once while the
+// page-load refresh is still polling (its first 5 minutes): every quick Save then said "the Mac hasn't applied it
+// yet (asleep?)" seconds after sending, and nothing looked for the answer afterwards. Now the Save polls on its own.
+// The Mac applies and publishes it within ~30 s (stats.py --if-asked, quick_reorder) even mid-scrape.
+async function tlWait(p) {
+  const sent = Date.now();
+  let slow = false;
+  while (TL.pending === p && DATA && Date.now() - sent < 10 * 60e3) {
+    await new Promise(r => setTimeout(r, 10000));
+    if (TL.pending !== p || !DATA) return;   // settled by another refresh, or signed out
+    if (await loadIfNew()) { renderAll(); continue; }   // renderTimeline -> tlSettle: applied, refused or stale
+    if (!slow && Date.now() - sent > 2 * 60e3) {
+      slow = true; tlNote("Sent; the Mac hasn't answered yet. Waiting…"); renderAll();
     }
+  }
+  if (TL.pending === p && DATA) {   // the row waits in the Worker for the Mac's next run
+    tlNote("Sent, but the Mac hasn't applied it in 10 minutes (asleep?). It goes in on its next run.", true); renderAll();
   }
 }
 function tlMove(title, to) {
