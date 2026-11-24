@@ -125,18 +125,27 @@ const toB64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
 // every 10-minute upload). DATA_VER = the version shown, so a refresh only downloads once a new one is there.
 const DATA_URL = "https://ink-analytics.inkideaandai.workers.dev/data";
 let DATA_VER = "";
-async function loadBlob() {
-  const r = await fetch(DATA_URL + "?t=" + Date.now(), {cache: "no-store"});
-  if (!r.ok) throw new Error("no data");
-  DATA_VER = r.headers.get("X-Data-Version") || "";
-  return r.json();
+async function loadBlob(tries = 3) {   // a busy Worker answers 503 now and then: wait and ask again (card #475)
+  for (let i = 1; ; i++) {
+    try {
+      const r = await fetch(DATA_URL + "?t=" + Date.now(), {cache: "no-store"});
+      if (!r.ok) throw new Error("no data");
+      DATA_VER = r.headers.get("X-Data-Version") || "";
+      return await r.json();
+    } catch (e) {
+      if (i >= tries) throw e;
+      await new Promise(res => setTimeout(res, 1500 * i));
+    }
+  }
 }
 async function dataVersion() {
   const r = await fetch(DATA_URL + "?version&t=" + Date.now(), {cache: "no-store"});
   return r.ok ? r.text() : "";
 }
 async function decrypt(key, blob) {
-  const plain = await crypto.subtle.decrypt({name: "AES-GCM", iv: b64(blob.iv), additionalData: enc.encode(blob.aad)}, key, b64(blob.ct));
+  let plain = await crypto.subtle.decrypt({name: "AES-GCM", iv: b64(blob.iv), additionalData: enc.encode(blob.aad)}, key, b64(blob.ct));
+  if (blob.zip === "gzip")   // gzipped before sealing since card #475 (15.5 MB -> ~1.8 MB)
+    plain = await new Response(new Blob([plain]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
   return JSON.parse(new TextDecoder().decode(plain));
 }
 function saved() {
@@ -162,8 +171,14 @@ const LOCAL = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
   }
   const s = saved();
   if (!s) return;
+  let blob;
   try {
-    const blob = await loadBlob();
+    blob = await loadBlob();
+  } catch (e) {   // the download failed, not the key: stay signed in so a reload picks up from here (card #475)
+    $("loginMsg").textContent = "Couldn't load the data. Reload in a minute.";
+    return;
+  }
+  try {
     if (blob.salt !== s.salt) throw new Error("password changed");
     const key = await crypto.subtle.importKey("raw", b64(s.k), {name: "AES-GCM"}, false, ["encrypt", "decrypt"]);
     DATA = await decrypt(key, blob);
