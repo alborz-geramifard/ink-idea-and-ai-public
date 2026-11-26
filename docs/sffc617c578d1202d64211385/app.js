@@ -128,10 +128,19 @@ let DATA_VER = "";
 async function loadBlob(tries = 3) {   // a busy Worker answers 503 now and then: wait and ask again (card #475)
   for (let i = 1; ; i++) {
     try {
-      const r = await fetch(DATA_URL + "?t=" + Date.now(), {cache: "no-store"});
-      if (!r.ok) throw new Error("no data");
-      DATA_VER = r.headers.get("X-Data-Version") || "";
-      return await r.json();
+      // the version + part count first, then every part as its own small request (card #506): one request for the
+      // whole 3.4 MB ran past the free Worker's CPU limit and failed with 1102
+      const h = await fetch(DATA_URL + "?head&t=" + Date.now(), {cache: "no-store"});
+      if (!h.ok) throw new Error("no data");
+      const [ver, n] = (await h.text()).split(" ");
+      const parts = await Promise.all([...Array(+n).keys()].map(async i => {
+        const r = await fetch(`${DATA_URL}?part=${i}&ver=${encodeURIComponent(ver)}&t=${Date.now()}`, {cache: "no-store"});
+        if (!r.ok) throw new Error("no data");
+        return r.text();
+      }));
+      const blob = JSON.parse(parts.join(""));
+      DATA_VER = ver;
+      return blob;
     } catch (e) {
       if (i >= tries) throw e;
       await new Promise(res => setTimeout(res, 1500 * i));
