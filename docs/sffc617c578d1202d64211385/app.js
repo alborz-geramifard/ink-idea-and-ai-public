@@ -1087,6 +1087,8 @@ function untilText(ms) {
 const QUEUE_URL = "https://ink-analytics.inkideaandai.workers.dev/queue";
 // Swap (card #423): drop a picture onto the middle of another, or tap ⇄ on one and then ⇄ on the other: the two trade
 // places and everything between them stays put (the edges of a picture still mean "insert before / after").
+// Video length under each date (card #503): over TL_LONG_S it turns red; 1 of 6 such Reels broke out vs 13 of 28 shorter
+const TL_LONG_S = 16;
 const TL = {edit: false, order: null, drag: null, pick: null, pending: null, note: "", bad: false, busy: false};
 const tlTitles = () => ((DATA.schedule && DATA.schedule.upcoming) || []).map(o => o.title);
 const sameList = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
@@ -1274,13 +1276,16 @@ function renderTimeline() {
     const arrows = TL.edit ? `<div class="tl-move"><button data-mv="-1" aria-label="Earlier" ${i ? "" : "disabled"}>‹</button>${swapBtn}` +
                              `<button data-mv="1" aria-label="Later" ${i < list.length - 1 ? "" : "disabled"}>›</button></div>` : "";
     html += `<div class="tl-item ${cls}" style="--i:${k++}" data-t="${esc(o.title)}"${TL.edit ? ' draggable="true"' : ""}>
+      ${onDay.length ? `<div class="tl-hol-top">${onDay.map(h => `<span class="tl-hol-tag" title="${esc(h.name)}">${h.icon} ${esc(h.name)}</span>`).join("")}</div>` : ""}
       <div class="tl-card">${card}${arrows}</div><div class="tl-stem"></div><div class="tl-node"></div>
       <div class="tl-date"><span class="tl-wd">${esc(d.toLocaleDateString([], {weekday: "short"}))}</span>
         <span class="tl-day">${d.getDate()}</span><span class="tl-mo">${esc(d.toLocaleDateString([], {month: "short"}))}</span>
         ${kd <= 1 ? `<span class="tl-rel">${esc(rel(kd))}</span>` : ""}
         ${formatTag(o.format)}
+        ${o.video && o.secs ? `<span class="tl-len${o.secs > TL_LONG_S ? " long" : ""}" title="${esc(o.secs > TL_LONG_S
+          ? `Video length ${o.secs} s: Reels over ${TL_LONG_S} s rarely got past Instagram's first test batch` : `Video length ${o.secs} s`)}">⏱ ${esc(o.secs.toFixed(1))} s</span>` : ""}
         ${moved ? `<span class="tl-was">was No. ${esc(o.was)}</span>` : ""}
-        ${onDay.map(h => `<span class="tl-hol-tag" title="${esc(h.name)}">${h.icon} ${esc(h.name)}</span>`).join("")}</div></div>`;
+      </div></div>`;
   });
   holsBefore(new Date(8.64e15));   // the ones after the last queued video
   const track = $("timeline");

@@ -270,7 +270,7 @@ a.icon.sitelink:hover { color: var(--text-primary); border-color: var(--accent);
 .tl-scroll { overflow-x: auto; overflow-y: hidden; scrollbar-width: none; outline: none;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 28px), transparent);
           mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
-.tl-track { --line: 270px; position: relative; display: flex; align-items: flex-start; gap: 6px; padding: 26px 40px 22px; width: max-content; }
+.tl-track { --top: 48px; --line: calc(var(--top) + 244px); position: relative; display: flex; align-items: flex-start; gap: 6px; padding: var(--top) 40px 22px; width: max-content; }
 /* the line itself: a gold ribbon that fades out at both ends */
 .tl-track::before { content: ""; position: absolute; left: 16px; right: 16px; top: var(--line); height: 4px; margin-top: -2px; border-radius: 4px;
   background: linear-gradient(90deg, transparent, var(--accent) 60px, color-mix(in srgb, var(--accent) 55%, var(--living)) 70%, transparent); opacity: .85; }
@@ -285,7 +285,7 @@ a.icon.sitelink:hover { color: var(--text-primary); border-color: var(--accent);
 .tl-item:hover .tl-img { transform: translateY(-6px) scale(1.04); box-shadow: 0 2px 4px rgba(0,0,0,.1), 0 18px 34px rgba(0,0,0,.24); }
 .tl-n.num { position: absolute; left: 6px; top: 6px; box-shadow: 0 2px 6px rgba(0,0,0,.25); pointer-events: none; transition: transform .22s; }
 .tl-item:hover .tl-n { transform: translateY(-6px); }
-.tl-stem { width: 2px; height: calc(var(--line) - 26px - 199px - 8px); margin-top: 8px;
+.tl-stem { width: 2px; height: calc(var(--line) - var(--top) - 199px - 8px); margin-top: 8px;
   background: linear-gradient(var(--border), color-mix(in srgb, var(--accent) 70%, transparent)); }
 .tl-node { width: 14px; height: 14px; border-radius: 50%; margin-top: -7px; position: relative; z-index: 1;
   background: var(--surface-1); border: 3px solid var(--accent); box-shadow: 0 0 0 4px var(--surface-1); transition: transform .2s; }
@@ -311,7 +311,7 @@ a.icon.sitelink:hover { color: var(--text-primary); border-color: var(--accent);
 .tl-item.img-only .tl-day { font-size: 20px; color: var(--text-muted); }
 
 /* "now" and month markers sit on the line */
-.tl-now, .tl-month { flex: none; position: relative; height: calc(var(--line) - 26px); display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+.tl-now, .tl-month { flex: none; position: relative; height: calc(var(--line) - var(--top)); display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
 .tl-now { width: 56px; }
 .tl-now-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--text-primary); margin-bottom: -6px; box-shadow: 0 0 0 4px var(--surface-1); position: relative; z-index: 1; }
 .tl-now::before { content: ""; position: absolute; bottom: 0; top: 20px; left: 50%; border-left: 2px dashed var(--text-muted); opacity: .6; }
@@ -322,8 +322,8 @@ a.icon.sitelink:hover { color: var(--text-primary); border-color: var(--accent);
   font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; padding: 3px 10px; border-radius: 999px;
   background: var(--text-primary); color: var(--surface-1); }
 
-/* holidays (card #193): a standing flag between slots; on a posting day a tag under that day's date */
-.tl-hol { --hol: #e8590c; flex: none; position: relative; width: 40px; height: calc(var(--line) - 26px);
+/* holidays (card #193): a standing flag between slots; on a posting day a tag above that day's picture */
+.tl-hol { --hol: #e8590c; flex: none; position: relative; width: 40px; height: calc(var(--line) - var(--top));
   display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
 .tl-hol::before { content: ""; position: absolute; bottom: 0; height: 40px; left: 50%; border-left: 2px solid var(--hol); opacity: .7; }
 .tl-hol-flag { position: absolute; bottom: 44px; left: 50%; transform: translateX(-50%) rotate(180deg); writing-mode: vertical-rl;
@@ -333,11 +333,15 @@ a.icon.sitelink:hover { color: var(--text-primary); border-color: var(--accent);
 .tl-hol-dot { width: 12px; height: 12px; border-radius: 3px; transform: rotate(45deg); margin-bottom: -6px; position: relative; z-index: 1;
   background: var(--hol); box-shadow: 0 0 0 4px var(--surface-1); }
 .tl-hol-d { position: absolute; top: calc(100% + 12px); font-size: 11px; font-weight: 700; color: var(--hol); white-space: nowrap; }
+/* a posting day's holiday sits above its picture (card #503), in the room the track's top padding leaves */
+.tl-hol-top { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 3px; z-index: 2; pointer-events: none; }
+.tl-hol-top .tl-hol-tag { margin-top: 0; max-width: none; white-space: nowrap; }
 .tl-hol-tag { margin-top: 6px; max-width: 100%; text-align: center; line-height: 1.25; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
   color: #fff; background: #e8590c; }
 .tl-item.holiday .tl-node { border-color: #e8590c; }
 
-.tl-arrow { position: absolute; top: 120px; z-index: 3; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border);
+.tl-arrow { position: absolute; top: 142px; z-index: 3; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border);
   background: color-mix(in srgb, var(--surface-1) 88%, transparent); font-size: 24px; line-height: 1;
   box-shadow: 0 4px 14px rgba(0,0,0,.14); transition: opacity .2s, transform .2s; }
 .tl-arrow:hover { transform: scale(1.08); }
@@ -365,6 +369,9 @@ a.icon.sitelink:hover { color: var(--text-primary); border-color: var(--accent);
 .tl-item.drop-before::before { left: -5px; }
 .tl-item.drop-after::after { right: -5px; }
 .tl-item.moved .tl-img.thumb { outline: 3px solid var(--living); outline-offset: 3px; }
+.tl-len { margin-top: 5px; font-size: 11px; font-weight: 600; color: var(--text-secondary); white-space: nowrap;
+          font-variant-numeric: tabular-nums; }
+.tl-len.long { color: var(--bad); }
 .tl-was { margin-top: 5px; font-size: 11px; font-weight: 600; color: var(--living); white-space: nowrap; }
 .tl-track.pending .tl-item { opacity: .8; }
 .tl-ghost small { display: block; margin-top: 4px; font-size: 10px; color: var(--text-secondary); word-break: break-word; }
