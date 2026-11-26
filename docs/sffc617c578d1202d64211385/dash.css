@@ -371,6 +371,9 @@ a.icon.sitelink:hover { color: var(--text-primary); border-color: var(--accent);
 .tl-item.moved .tl-img.thumb { outline: 3px solid var(--living); outline-offset: 3px; }
 .tl-len { margin-top: 5px; font-size: 11px; font-weight: 600; color: var(--text-secondary); white-space: nowrap;
           font-variant-numeric: tabular-nums; }
+/* the video's opening hook text (card #503), at most three lines; the full text on hover */
+.tl-hook { margin-top: 5px; max-width: 116px; text-align: center; font-family: Georgia, serif; font-style: italic; font-size: 11.5px;
+  line-height: 1.3; color: var(--text-primary); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .tl-len.long { color: var(--bad); }
 .tl-was { margin-top: 5px; font-size: 11px; font-weight: 600; color: var(--living); white-space: nowrap; }
 .tl-track.pending .tl-item { opacity: .8; }

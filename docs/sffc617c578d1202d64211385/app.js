@@ -1284,6 +1284,7 @@ function renderTimeline() {
         ${formatTag(o.format)}
         ${o.video && o.secs ? `<span class="tl-len${o.secs > TL_LONG_S ? " long" : ""}" title="${esc(o.secs > TL_LONG_S
           ? `Video length ${o.secs} s: Reels over ${TL_LONG_S} s rarely got past Instagram's first test batch` : `Video length ${o.secs} s`)}">⏱ ${esc(o.secs.toFixed(1))} s</span>` : ""}
+        ${o.video && o.hook ? `<span class="tl-hook" title="${esc(`Hook: ${o.hook}`)}">“${esc(o.hook)}”</span>` : ""}
         ${moved ? `<span class="tl-was">was No. ${esc(o.was)}</span>` : ""}
       </div></div>`;
   });
