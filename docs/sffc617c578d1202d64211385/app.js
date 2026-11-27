@@ -1208,6 +1208,27 @@ const holMarker = h => {
   return `<div class="tl-hol" title="${esc(`${h.name} · ${label}`)}"><span class="tl-hol-flag"><span class="tl-hol-i">${h.icon}</span>${esc(h.name)}</span>
     <span class="tl-hol-dot"></span><span class="tl-hol-d">${esc(d.toLocaleDateString([], {month: "short", day: "numeric"}))}</span></div>`;
 };
+// hashtags per platform as they will go out (card #524): Instagram's on each card, every platform on hover and for
+// the next video; a platform without its own Config/hashtags.yaml entry is flagged (it posts the generic fallback)
+const TL_PLAT = [["instagram", "Instagram"], ["tiktok", "TikTok"], ["youtube", "YouTube"], ["facebook", "Facebook"],
+                 ["linkedin", "LinkedIn"], ["pinterest", "Pinterest"], ["x", "X"], ["threads", "Threads topic"]];
+function tlTagsTitle(o) {
+  const t = o.tags || {}, d = o.tags_default || [];
+  return TL_PLAT.map(([k, n]) => `${n}: ${t[k] || "(none)"}${d.includes(k) ? "  ⚠ default" : ""}`).join("\n");
+}
+function tlTags(o) {
+  const t = o.tags || {}, d = o.tags_default || [];
+  if (!Object.keys(t).length) return `<span class="tl-tags bad">no hashtags</span>`;
+  const warn = d.filter(k => k !== "threads").length;
+  return `<span class="tl-tags${warn ? " bad" : ""}" title="${esc(tlTagsTitle(o))}">${warn ? `⚠ default tags on ${warn}<br>` : ""}${esc(t.instagram || "")}</span>`;
+}
+function tlTagTable(o) {
+  const t = o.tags || {}, d = o.tags_default || [];
+  if (!Object.keys(t).length) return "";
+  return `<details class="tl-next-tags"><summary>Hashtags</summary><dl>${TL_PLAT.map(([k, n]) =>
+    `<dt>${esc(n)}</dt><dd${d.includes(k) && k !== "threads" ? ' class="bad"' : ""}>${esc(t[k] || "(none)")}${d.includes(k) && k !== "threads" ? " · default" : ""}</dd>`).join("")}</dl></details>`;
+}
+
 function renderTimeline() {
   const S = DATA.schedule, up = (S && S.upcoming) || [];
   tlSettle();
@@ -1242,7 +1263,8 @@ function renderTimeline() {
   const tick = () => {
     $("tlNext").innerHTML = `<img src="${first.big || first.thumb}" alt="" class="tl-next-img">
       <div><div class="tl-kicker">Next video</div><div class="tl-next-t">${num(first.n)} ${esc(first.title)}</div>
-      <div class="tl-next-when"><b>${esc(untilText(new Date(first.date) - Date.now()))}</b> · ${esc(longDay(first.date))}, ${esc(hourText(new Date(first.date).getHours()))}</div></div>`;
+      <div class="tl-next-when"><b>${esc(untilText(new Date(first.date) - Date.now()))}</b> · ${esc(longDay(first.date))}, ${esc(hourText(new Date(first.date).getHours()))}</div>
+      ${tlTagTable(first)}</div>`;
   };
   tick();
   clearInterval(renderTimeline.timer);
@@ -1294,6 +1316,7 @@ function renderTimeline() {
         ${o.video && o.secs ? `<span class="tl-len${o.secs > TL_LONG_S ? " long" : ""}" title="${esc(o.secs > TL_LONG_S
           ? `Video length ${o.secs} s: Reels over ${TL_LONG_S} s rarely got past Instagram's first test batch` : `Video length ${o.secs} s`)}">⏱ ${esc(o.secs.toFixed(1))} s</span>` : ""}
         ${o.video && o.hook ? `<span class="tl-hook" title="${esc(`Hook: ${o.hook}`)}">“${esc(o.hook)}”</span>` : ""}
+        ${o.video ? tlTags(o) : ""}
         ${moved ? `<span class="tl-was">was No. ${esc(o.was)}</span>` : ""}
       </div></div>`;
   });
